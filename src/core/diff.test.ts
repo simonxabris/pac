@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { diffJson } from "../../src/core/diff.js";
-import { decodeJsonObject } from "../../src/core/json.js";
+import { diffJson } from "./diff.js";
+import { decodeJsonObject } from "./json.js";
 
 const productSemantics = [
   { path: "/name", rule: { mode: "update" as const } },

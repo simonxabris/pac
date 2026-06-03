@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { describe, expect, it } from "vitest";
-import type { Plan } from "../../src/core/plan.js";
-import { PolarOperationExecutor } from "../../src/provider/polar/operation-executor.js";
-import { PlanExecutor } from "../../src/plan/executor.js";
+import type { Plan } from "../core/plan.js";
+import { PolarOperationExecutor } from "../provider/polar/operation-executor.js";
+import { PlanExecutor } from "./executor.js";
 
 const basePlan: Plan = {
   provider: "polar",

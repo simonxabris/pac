@@ -2,11 +2,11 @@ import type { Meter as RemoteMeter } from "@polar-sh/sdk/models/components/meter
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { describe, expect, it } from "vitest";
-import { decodeJsonObject } from "../../../src/core/json.js";
-import { encodePaacMetadata } from "../../../src/core/metadata.js";
-import type { Operation } from "../../../src/core/plan.js";
-import { PolarClient, type PolarClientShape } from "../../../src/polar/service.js";
-import { PolarOperationExecutor } from "../../../src/provider/polar/operation-executor.js";
+import { decodeJsonObject } from "../../core/json.js";
+import { encodePaacMetadata } from "../../core/metadata.js";
+import type { Operation } from "../../core/plan.js";
+import { PolarClient, type PolarClientShape } from "../../polar/service.js";
+import { PolarOperationExecutor } from "./operation-executor.js";
 
 const remoteMeter = (): RemoteMeter =>
   ({

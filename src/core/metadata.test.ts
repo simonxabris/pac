@@ -3,7 +3,7 @@ import {
   decodePaacMetadata,
   decodePaacMetadataResult,
   encodePaacMetadata,
-} from "../../src/core/metadata.js";
+} from "./metadata.js";
 
 const identity = {
   version: 1 as const,

@@ -7,7 +7,7 @@ import {
   Meter,
   meteredUnitPrice,
   Product,
-} from "../../src/index.js";
+} from "../index.js";
 
 const requestsMeter = () =>
   new Meter("requests", {

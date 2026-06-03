@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { decodeJsonObject } from "../../src/core/json.js";
-import type { Plan } from "../../src/core/plan.js";
-import { renderPlan } from "../../src/plan/render.js";
+import { decodeJsonObject } from "../core/json.js";
+import type { Plan } from "../core/plan.js";
+import { renderPlan } from "./render.js";
 
 const basePlan: Plan = {
   provider: "polar",

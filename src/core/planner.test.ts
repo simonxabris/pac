@@ -1,11 +1,11 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { describe, expect, it } from "vitest";
-import type { ResourceAdapter } from "../../src/core/adapter.js";
-import { AdapterRegistry } from "../../src/core/adapter-registry.js";
-import { errorDiagnostic } from "../../src/core/diagnostic.js";
-import { decodeJsonObject } from "../../src/core/json.js";
-import { Planner } from "../../src/core/planner.js";
+import type { ResourceAdapter } from "./adapter.js";
+import { AdapterRegistry } from "./adapter-registry.js";
+import { errorDiagnostic } from "./diagnostic.js";
+import { decodeJsonObject } from "./json.js";
+import { Planner } from "./planner.js";
 
 const malformedMetadataAdapter: ResourceAdapter = {
   kind: "product",

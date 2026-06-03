@@ -1,10 +1,10 @@
 import type { Meter as RemoteMeter } from "@polar-sh/sdk/models/components/meter.js";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
-import { encodePaacMetadata } from "../../../../../src/core/metadata.js";
-import type { DesiredResource } from "../../../../../src/core/resource.js";
-import type { PolarClientShape } from "../../../../../src/polar/service.js";
-import { makeMeterAdapter } from "../../../../../src/provider/polar/resources/meter/adapter.js";
+import { encodePaacMetadata } from "../../../../core/metadata.js";
+import type { DesiredResource } from "../../../../core/resource.js";
+import type { PolarClientShape } from "../../../../polar/service.js";
+import { makeMeterAdapter } from "./adapter.js";
 
 const fakePolar: PolarClientShape = {
   listProducts: () => Effect.succeed([]),

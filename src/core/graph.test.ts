@@ -3,8 +3,8 @@ import {
   addConvergeBeforeDestroyDependencies,
   addResourceOperationDependencies,
   orderOperations,
-} from "../../src/core/graph.js";
-import type { Operation, ResourceChange } from "../../src/core/plan.js";
+} from "./graph.js";
+import type { Operation, ResourceChange } from "./plan.js";
 
 const operation = (
   id: string,

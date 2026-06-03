@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { and, count, eventName, eventTimestamp, metadata, Meter, sum } from "../../src/index.js";
+import { and, count, eventName, eventTimestamp, metadata, Meter, sum } from "../index.js";
 
 describe("Meter resource API", () => {
   it("requires resource keys to match the PAAC key grammar", () => {
