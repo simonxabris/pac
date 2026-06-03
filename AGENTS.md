@@ -15,3 +15,7 @@ Use this to explore APIs, find usage examples, and understand implementation det
 `~/.local/share/effect-solutions/executor` is an app implemented with idiomatic effect v4 source code. Use it for inspiration.
 
 `~/.local/share/effect-solutions/opencode` is the source code of the opencode coding agent and is full of of useful idiomatic effect examples.
+
+# IaaC patterns
+
+The top level `sst` folder is the source code of the sst infrastructure as code library. Use it to research IaaC related patterns and questions.

@@ -7,15 +7,19 @@ const counts = (actions: ReadonlyArray<PlanAction>) => ({
   noop: actions.filter((action) => action.type === "no-op").length,
 });
 
-export const renderPlan = (project: string, actions: ReadonlyArray<PlanAction>): string => {
+export const renderPlan = (
+  project: string,
+  actions: ReadonlyArray<PlanAction>,
+  mode: "preview" | "deploy" = "preview",
+): string => {
   const lines = [`PAAC plan for project ${project}`, ""];
   for (const action of actions) {
     if (action.type === "create") {
       const price = action.payload.prices[0];
       lines.push(`+ create ${action.address}`);
       lines.push(`  name: ${action.payload.name}`);
-      lines.push(`  price: ${price.price_amount} ${price.price_currency}`);
-      lines.push(`  recurring: ${action.payload.recurring_interval ?? "one-time"}${action.payload.recurring_interval_count === null ? "" : ` x ${action.payload.recurring_interval_count}`}`);
+      lines.push(`  price: ${price.priceAmount} ${price.priceCurrency}`);
+      lines.push(`  recurring: ${action.payload.recurringInterval ?? "one-time"}${action.payload.recurringIntervalCount === null ? "" : ` x ${action.payload.recurringIntervalCount}`}`);
     } else if (action.type === "update") {
       lines.push(`~ update ${action.address} (${action.remoteId})`);
       for (const change of action.changes) lines.push(`  ${change.field}: ${JSON.stringify(change.before)} -> ${JSON.stringify(change.after)}`);
@@ -28,6 +32,6 @@ export const renderPlan = (project: string, actions: ReadonlyArray<PlanAction>):
   }
   const summary = counts(actions);
   lines.push(`Plan: ${summary.create} to create, ${summary.update} to update, ${summary.archive} to archive, ${summary.noop} unchanged.`);
-  lines.push("No changes were applied.");
+  lines.push(mode === "preview" ? "No changes were applied." : "Ready to apply changes.");
   return lines.join("\n");
 };

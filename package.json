@@ -16,7 +16,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "tsx src/cli.ts",
+    "dev": "node --env-file=.env --import tsx src/cli.ts",
     "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
     "start": "node dist/cli.js",
     "test": "vitest run",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.76",
+    "@polar-sh/sdk": "^0.47.1",
     "effect": "4.0.0-beta.76"
   },
   "devDependencies": {

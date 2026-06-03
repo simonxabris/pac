@@ -1,3 +1,6 @@
+import type { PresentmentCurrency } from "@polar-sh/sdk/models/components/presentmentcurrency.js";
+import type { ProductVisibility } from "@polar-sh/sdk/models/components/productvisibility.js";
+import type { SubscriptionRecurringInterval } from "@polar-sh/sdk/models/components/subscriptionrecurringinterval.js";
 import { registerResource } from "./registry.js";
 
 export type ProductConfig = {
@@ -5,25 +8,25 @@ export type ProductConfig = {
   readonly description?: string | null;
   readonly price: string | number;
   readonly currency?: string;
-  readonly visibility?: "public" | "hidden";
-  readonly recurringInterval?: "day" | "week" | "month" | "year" | null;
+  readonly visibility?: ProductVisibility;
+  readonly recurringInterval?: SubscriptionRecurringInterval | null;
   readonly recurringIntervalCount?: number;
   readonly organizationId?: string;
 };
 
 export type ProductPricePayload = {
-  readonly amount_type: "fixed";
-  readonly price_amount: number;
-  readonly price_currency: string;
+  readonly amountType: "fixed";
+  readonly priceAmount: number;
+  readonly priceCurrency: PresentmentCurrency;
 };
 
 export type ProductCreatePayload = {
   readonly name: string;
   readonly description: string | null;
-  readonly visibility: "public" | "hidden";
-  readonly organization_id?: string;
-  readonly recurring_interval: "day" | "week" | "month" | "year" | null;
-  readonly recurring_interval_count: number | null;
+  readonly visibility: ProductVisibility;
+  readonly organizationId?: string;
+  readonly recurringInterval: SubscriptionRecurringInterval | null;
+  readonly recurringIntervalCount: number | null;
   readonly prices: ReadonlyArray<ProductPricePayload>;
   readonly metadata: Record<string, string | number | boolean>;
 };
@@ -32,7 +35,7 @@ export type ProductUpdatePayload = Partial<
   Omit<ProductCreatePayload, "metadata" | "prices">
 > & {
   readonly prices?: ReadonlyArray<ProductPricePayload>;
-  readonly is_archived?: boolean;
+  readonly isArchived?: boolean;
 };
 
 export type DesiredProduct = {
@@ -75,24 +78,26 @@ export class Product {
         visibility: this.config.visibility ?? "public",
         ...(this.config.organizationId === undefined
           ? {}
-          : { organization_id: this.config.organizationId }),
-        recurring_interval: recurringInterval,
-        recurring_interval_count:
+          : { organizationId: this.config.organizationId }),
+        recurringInterval,
+        recurringIntervalCount:
           recurringInterval === null
             ? null
             : (this.config.recurringIntervalCount ?? 1),
         prices: [
           {
-            amount_type: "fixed",
-            price_amount: dollarsToCents(this.config.price),
-            price_currency: this.config.currency ?? "usd",
+            amountType: "fixed",
+            priceAmount: dollarsToCents(this.config.price),
+            priceCurrency: (this.config.currency ?? "usd") as PresentmentCurrency,
           },
         ],
         metadata: {
-          paac_type: "product",
-          paac_key: this.key,
-          paac_addr: this.address,
-          paac_project: project,
+          paac: JSON.stringify({
+            type: "product",
+            key: this.key,
+            addr: this.address,
+            project,
+          }),
         },
       },
     };

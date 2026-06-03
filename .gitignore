@@ -147,3 +147,5 @@ vite.config.ts.timestamp-*
 .vite/
 
 tsconfig.tsbuildinfo
+
+sst/
