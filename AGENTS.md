@@ -19,3 +19,5 @@ Use this to explore APIs, find usage examples, and understand implementation det
 # IaaC patterns
 
 The top level `sst` folder is the source code of the sst infrastructure as code library. Use it to research IaaC related patterns and questions.
+
+/alchemy-effect is an IaaC library implemented with Effect.

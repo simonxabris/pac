@@ -1,9 +1,8 @@
-import { Product } from "paac";
+import { Product, fixedPrice } from "paac";
 
 export const pro = new Product("pro", {
   name: "Paac Pro plan",
   description: "For serious users",
-  price: "20",
-  currency: "usd",
+  price: fixedPrice({ amount: "30", currency: "usd" }),
   recurringInterval: "month",
 });

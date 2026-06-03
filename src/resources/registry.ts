@@ -1,7 +1,11 @@
+import type { DesiredResource } from "../core/resource.js";
+
 export type Resource = {
   readonly type: string;
+  readonly kind: string;
   readonly key: string;
   readonly address: string;
+  readonly toDesiredResource: () => DesiredResource;
 };
 
 const registryKey = Symbol.for("paac.resources");

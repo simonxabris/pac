@@ -813,7 +813,8 @@ Ideal behavior:
 2. Remote Product Prices can be matched to desired Product Price keys.
 3. Unchanged Product Prices are not included in Product update payloads unless the provider requires it for a deliberate Product Price change.
 4. Product Price changes are rendered as Product field changes, with pricing changes visually distinguished from low-risk fields such as description.
-5. The plan must not expose provider-specific Product Price lifecycle details such as price IDs or attachment mechanics.
+5. Human plan output should format Product Price amounts in major currency units for readability, even though canonical data, JSON plan output, and Polar SDK payloads use minor units.
+6. The plan must not expose provider-specific Product Price lifecycle details such as price IDs or attachment mechanics.
 6. If a remote Product Price cannot be matched to a key, block or mark unmanaged.
 
 First implementation can support one static Product Price and should block unsupported states instead of guessing.
@@ -967,7 +968,7 @@ PAAC plan
 + product.pro
   create Polar product
   name: "Pro plan"
-  price[base]: 2000 usd fixed
+  price[base]: 20.00 usd fixed
   billing: recurring month x 1
 
 ~ meter.apiRequests (meter-id)
@@ -975,7 +976,7 @@ PAAC plan
   /filter: {"event":"api_call"} -> {"event":"api_request"}
 
 ~ product.pro (product-id)
-  ! /prices/base/amount: 2000 -> 2500
+  ! price[base]: 20.00 usd -> 25.00 usd
 
 ! product.enterprise blocked
   /billing/recurringInterval: "month" -> "year"
@@ -1074,7 +1075,7 @@ The first adapter should implement Product support on the generic architecture. 
 
 ## Product price helper API
 
-Use explicit price helpers in user configuration. Helper amounts are major currency units; canonical data and Polar SDK payloads use minor units.
+Use explicit price helpers in user configuration. Helper amounts are major currency units; canonical data, JSON plan output, and Polar SDK payloads use minor units. Human plan output should convert Product Price amounts back to major currency units for readability.
 
 ```ts
 new Product("pro", {

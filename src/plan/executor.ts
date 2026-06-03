@@ -1,34 +1,35 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { PolarClient } from "../polar/service.js";
-import type { PlanAction } from "./diff.js";
+import { hasErrors } from "../core/diagnostic.js";
+import type { Plan } from "../core/plan.js";
+import { PolarOperationExecutor } from "../provider/polar/operation-executor.js";
 
 export type PlanExecutorShape = {
-  readonly execute: (actions: ReadonlyArray<PlanAction>) => Effect.Effect<void>;
+  readonly execute: (plan: Plan) => Effect.Effect<void, Error>;
 };
 
 export class PlanExecutor extends Context.Service<PlanExecutor, PlanExecutorShape>()("@paac/PlanExecutor") {
   static readonly layer = Layer.effect(
     PlanExecutor,
     Effect.gen(function*() {
-      const polar = yield* PolarClient;
+      const operationExecutor = yield* PolarOperationExecutor;
 
-      const executeAction = Effect.fn("PlanExecutor.executeAction")(function* (action: PlanAction) {
-        switch (action.type) {
-          case "create":
-            return yield* polar.createProduct(action.payload);
-          case "update":
-            return yield* polar.updateProduct(action.remoteId, action.payload);
-          case "archive":
-            return yield* polar.archiveProduct(action.remoteId);
-          case "no-op":
-            return undefined;
+      const execute = Effect.fn("PlanExecutor.execute")(function* (plan: Plan) {
+        if (hasErrors(plan.diagnostics)) {
+          return yield* Effect.fail(new Error("Refusing to deploy a plan with error diagnostics."));
         }
-      });
 
-      const execute = Effect.fn("PlanExecutor.execute")(function* (actions: ReadonlyArray<PlanAction>) {
-        yield* Effect.forEach(actions, executeAction, { discard: true, concurrency: 1 });
+        yield* Effect.forEach(
+          plan.operations,
+          (operation) => {
+            if (!operationExecutor.canExecute(operation)) {
+              return Effect.fail(new Error(`No executor can run operation ${operation.id}.`));
+            }
+            return operationExecutor.execute(operation);
+          },
+          { discard: true, concurrency: 1 },
+        );
       });
 
       return PlanExecutor.of({ execute });
