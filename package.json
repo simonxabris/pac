@@ -1,0 +1,39 @@
+{
+  "name": "paac",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
+  "bin": {
+    "paac": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "lint": "oxlint -c .oxlintrc.ts",
+    "format": "oxfmt -c .oxfmtrc.ts --write .",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "effect": "4.0.0-beta.76"
+  },
+  "devDependencies": {
+    "@effect/language-service": "^0.86.2",
+    "@types/node": "^25.9.1",
+    "@typescript/native-preview": "7.0.0-dev.20260603.1",
+    "oxfmt": "^0.53.0",
+    "oxlint": "^1.68.0",
+    "oxlint-tsgolint": "^0.23.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
