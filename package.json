@@ -6,16 +6,21 @@
   "license": "ISC",
   "author": "",
   "bin": {
-    "paac": "./dist/index.js"
+    "paac": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
-    "start": "node dist/index.js",
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "oxlint -c .oxlintrc.ts",
     "format": "oxfmt -c .oxfmtrc.ts --write .",
     "typecheck": "tsgo --noEmit"
@@ -32,7 +37,8 @@
     "oxlint": "^1.68.0",
     "oxlint-tsgolint": "^0.23.0",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   },
   "engines": {
     "node": ">=20"

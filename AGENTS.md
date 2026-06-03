@@ -3,6 +3,10 @@
 This project aims to provide an infrastacture as code type of experience to the polar payment platform.
 What i want is i create my products in code and then run `paac deploy` or similar and it will create those products in polar.
 
+# Polar api reference
+
+The polar openapi spec is in `./docs/reference/polar-openapi.json` .
+
 # Local Effect Source
 
 The Effect repository beta/v4 is cloned to `~/.local/share/effect-solutions/effect-v4` for reference.
