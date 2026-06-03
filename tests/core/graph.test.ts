@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { addResourceOperationDependencies, orderOperations } from "../../src/core/graph.js";
+import {
+  addConvergeBeforeDestroyDependencies,
+  addResourceOperationDependencies,
+  orderOperations,
+} from "../../src/core/graph.js";
 import type { Operation, ResourceChange } from "../../src/core/plan.js";
 
-const operation = (id: string, address: `product.${string}`, dependsOn: ReadonlyArray<string> = []): Operation => ({
+const operation = (
+  id: string,
+  address: `product.${string}`,
+  dependsOn: ReadonlyArray<string> = [],
+  action: Operation["action"] = "create",
+): Operation => ({
   id,
   provider: "polar",
   kind: "product",
   address,
-  action: "create",
+  action,
   call: "products.create",
   input: {},
   dependsOn,
@@ -45,6 +54,22 @@ describe("operation graph", () => {
 
     expect(result.diagnostics).toEqual([]);
     expect(result.operations.map((item) => item.id)).toEqual(["create:base", "create:pro"]);
+  });
+
+  it("adds dependencies so convergent operations run before destructive operations", () => {
+    const operations = addConvergeBeforeDestroyDependencies([
+      operation("meter.archive:requests", "product.requests", [], "archive"),
+      operation("meter.create:tokens", "product.tokens"),
+      operation("product.update:pro", "product.pro", ["meter.create:tokens"], "update"),
+    ]);
+    const result = orderOperations(operations);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.operations.map((item) => item.id)).toEqual([
+      "meter.create:tokens",
+      "product.update:pro",
+      "meter.archive:requests",
+    ]);
   });
 
   it("reports dependency cycles", () => {

@@ -1,8 +1,9 @@
 import type { ProductVisibility } from "@polar-sh/sdk/models/components/productvisibility.js";
 import type { SubscriptionRecurringInterval } from "@polar-sh/sdk/models/components/subscriptionrecurringinterval.js";
 import * as Schema from "effect/Schema";
-import { decodeResourceKey } from "../core/address.js";
+import { decodeResourceAddress, decodeResourceKey, type ResourceAddress } from "../core/address.js";
 import type { DesiredResource } from "../core/resource.js";
+import type { Meter } from "./meter.js";
 import { registerResource } from "./registry.js";
 
 const MajorAmount = Schema.Union([Schema.String, Schema.Number]);
@@ -37,16 +38,25 @@ const CustomPriceConfigSchema = Schema.Struct({
   presetAmount: Schema.optionalKey(Schema.NullOr(MajorAmount)),
 });
 
+const MeteredUnitPriceConfigSchema = Schema.Struct({
+  type: Schema.Literal("meteredUnit"),
+  meter: Schema.String,
+  amount: MajorAmount,
+  currency: Schema.String,
+  capAmount: Schema.optionalKey(Schema.NullOr(MajorAmount)),
+});
+
 const ProductPriceConfigSchema = Schema.Union([
   FixedPriceConfigSchema,
   FreePriceConfigSchema,
   CustomPriceConfigSchema,
+  MeteredUnitPriceConfigSchema,
 ]);
 
 const ProductConfigSchema = Schema.Struct({
   name: Schema.String,
   description: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  price: ProductPriceConfigSchema,
+  prices: Schema.Array(ProductPriceConfigSchema),
   visibility: Schema.optionalKey(ProductVisibilitySchema),
   recurringInterval: Schema.optionalKey(Schema.NullOr(RecurringIntervalSchema)),
   recurringIntervalCount: Schema.optionalKey(Schema.Number),
@@ -62,6 +72,9 @@ const decodeFreePriceConfig = Schema.decodeUnknownSync(FreePriceConfigSchema, {
 const decodeCustomPriceConfig = Schema.decodeUnknownSync(CustomPriceConfigSchema, {
   onExcessProperty: "error",
 });
+const decodeMeteredUnitPriceConfig = Schema.decodeUnknownSync(MeteredUnitPriceConfigSchema, {
+  onExcessProperty: "error",
+});
 const decodeProductConfig = Schema.decodeUnknownSync(ProductConfigSchema, {
   onExcessProperty: "error",
 });
@@ -69,26 +82,44 @@ const decodeProductConfig = Schema.decodeUnknownSync(ProductConfigSchema, {
 export type FixedPriceConfig = typeof FixedPriceConfigSchema.Type;
 export type FreePriceConfig = typeof FreePriceConfigSchema.Type;
 export type CustomPriceConfig = typeof CustomPriceConfigSchema.Type;
+export type MeteredUnitPriceConfig = typeof MeteredUnitPriceConfigSchema.Type;
 export type ProductPriceConfig = typeof ProductPriceConfigSchema.Type;
 export type ProductConfig = typeof ProductConfigSchema.Type;
 
+type CanonicalPriceInput =
+  | {
+      readonly amountType: "fixed";
+      readonly priceAmount: number;
+      readonly priceCurrency: string;
+    }
+  | {
+      readonly amountType: "free";
+      readonly priceCurrency: string;
+    }
+  | {
+      readonly amountType: "custom";
+      readonly priceCurrency: string;
+      readonly minimumAmount: number;
+      readonly maximumAmount: number | null;
+      readonly presetAmount: number | null;
+    }
+  | {
+      readonly amountType: "metered_unit";
+      readonly priceCurrency: string;
+      readonly meterAddress: ResourceAddress;
+      readonly unitAmount: string | number;
+      readonly capAmount: number | null;
+    };
+
 export type ProductPricePayload =
+  | Exclude<CanonicalPriceInput, { readonly amountType: "metered_unit" }>
   | {
-    readonly amountType: "fixed";
-    readonly priceAmount: number;
-    readonly priceCurrency: string;
-  }
-  | {
-    readonly amountType: "free";
-    readonly priceCurrency: string;
-  }
-  | {
-    readonly amountType: "custom";
-    readonly priceCurrency: string;
-    readonly minimumAmount: number;
-    readonly maximumAmount: number | null;
-    readonly presetAmount: number | null;
-  };
+      readonly amountType: "metered_unit";
+      readonly priceCurrency: string;
+      readonly meterId: string;
+      readonly unitAmount: string | number;
+      readonly capAmount: number | null;
+    };
 
 export type ProductCreatePayload = {
   readonly name: string;
@@ -101,7 +132,7 @@ export type ProductCreatePayload = {
 };
 
 export type ProductUpdatePayload = Partial<Omit<ProductCreatePayload, "metadata" | "prices">> & {
-  readonly prices?: ReadonlyArray<ProductPricePayload>;
+  readonly prices?: ReadonlyArray<ProductPricePayload | { readonly id: string }>;
   readonly isArchived?: boolean;
 };
 
@@ -119,6 +150,21 @@ export const dollarsToCents = (value: string | number): number => {
   return Math.round(numberValue * 100);
 };
 
+const majorToMinorDecimal = (value: string | number): string => {
+  const text = String(decodeMajorAmount(value)).trim();
+  if (!/^\d+(?:\.\d+)?$/.test(text)) {
+    throw new Error(`Invalid metered unit amount: ${String(value)}`);
+  }
+  const [whole = "0", fraction = ""] = text.split(".");
+  const centsWhole = `${whole}${fraction.padEnd(2, "0").slice(0, 2)}`.replace(/^0+(?=\d)/, "");
+  const centsFraction = fraction.length > 2 ? fraction.slice(2).replace(/0+$/, "") : "";
+  const result = centsFraction.length > 0 ? `${centsWhole}.${centsFraction}` : centsWhole;
+  if (Number(result) <= 0) {
+    throw new Error("Metered unit amount must be greater than zero.");
+  }
+  return result;
+};
+
 const amountOrNullToCents = (value: string | number | null | undefined): number | null =>
   value === null || value === undefined ? null : dollarsToCents(value);
 
@@ -131,7 +177,30 @@ export const freePrice = (config: Omit<FreePriceConfig, "type">): FreePriceConfi
 export const customPrice = (config: Omit<CustomPriceConfig, "type">): CustomPriceConfig =>
   decodeCustomPriceConfig({ type: "custom", ...config });
 
-const toCanonicalPrice = (price: ProductPriceConfig): ProductPricePayload => {
+export const meteredUnitPrice = (
+  config: Omit<MeteredUnitPriceConfig, "type" | "meter"> & {
+    readonly meter: Meter | ResourceAddress;
+  },
+): MeteredUnitPriceConfig => {
+  const meterAddress = decodeResourceAddress(
+    typeof config.meter === "string" ? config.meter : config.meter.address,
+  );
+  if (!meterAddress.startsWith("meter.")) {
+    throw new Error("Metered Product Prices must reference a Meter resource.");
+  }
+  return decodeMeteredUnitPriceConfig({
+    type: "meteredUnit",
+    ...config,
+    meter: meterAddress,
+  });
+};
+
+const meterPriceKey = (meterAddress: string): string =>
+  meterAddress.startsWith("meter.")
+    ? `meter:${meterAddress.slice("meter.".length)}`
+    : `meter:${meterAddress}`;
+
+const toCanonicalPrice = (price: ProductPriceConfig): CanonicalPriceInput => {
   switch (price.type) {
     case "fixed":
       return {
@@ -149,6 +218,14 @@ const toCanonicalPrice = (price: ProductPriceConfig): ProductPricePayload => {
         maximumAmount: amountOrNullToCents(price.maximumAmount),
         presetAmount: amountOrNullToCents(price.presetAmount),
       };
+    case "meteredUnit":
+      return {
+        amountType: "metered_unit",
+        priceCurrency: price.currency.toLowerCase(),
+        meterAddress: price.meter as ResourceAddress,
+        unitAmount: majorToMinorDecimal(price.amount),
+        capAmount: amountOrNullToCents(price.capAmount),
+      };
   }
 };
 
@@ -163,12 +240,26 @@ export class Product {
     this.key = decodeResourceKey(key);
     this.address = `product.${this.key}`;
     this.config = decodeProductConfig(config);
+    if (this.config.prices.length === 0) {
+      throw new Error("Product requires at least one price.");
+    }
+    const staticPrices = this.config.prices.filter((price) => price.type !== "meteredUnit");
+    if (staticPrices.length > 1) {
+      throw new Error("Product can have at most one static price.");
+    }
+    const hasMeteredPrices = this.config.prices.some((price) => price.type === "meteredUnit");
+    if (hasMeteredPrices && this.config.recurringInterval == null) {
+      throw new Error("Metered Product Prices require a recurring product.");
+    }
     registerResource(this);
   }
 
   toDesiredResource(): DesiredProduct {
     const recurringInterval = this.config.recurringInterval ?? null;
-    const price = toCanonicalPrice(this.config.price);
+    const prices = this.config.prices.map(toCanonicalPrice);
+    const dependencies = this.config.prices.flatMap((price) =>
+      price.type === "meteredUnit" ? [price.meter as ResourceAddress] : [],
+    );
     const managed = {
       name: this.config.name,
       description: this.config.description ?? null,
@@ -179,36 +270,45 @@ export class Product {
         recurringIntervalCount:
           recurringInterval === null ? null : (this.config.recurringIntervalCount ?? 1),
       },
-      prices: [
+      prices: prices.map((price) =>
         price.amountType === "fixed"
           ? {
-            key: "base" as const,
-            type: "fixed" as const,
-            amount: price.priceAmount,
-            currency: price.priceCurrency,
-          }
-          : price.amountType === "free"
-            ? {
               key: "base" as const,
-              type: "free" as const,
+              type: "fixed" as const,
+              amount: price.priceAmount,
               currency: price.priceCurrency,
             }
-            : {
-              key: "base" as const,
-              type: "custom" as const,
-              currency: price.priceCurrency,
-              minimumAmount: price.minimumAmount,
-              maximumAmount: price.maximumAmount,
-              presetAmount: price.presetAmount,
-            },
-      ],
+          : price.amountType === "free"
+            ? {
+                key: "base" as const,
+                type: "free" as const,
+                currency: price.priceCurrency,
+              }
+            : price.amountType === "custom"
+              ? {
+                  key: "base" as const,
+                  type: "custom" as const,
+                  currency: price.priceCurrency,
+                  minimumAmount: price.minimumAmount,
+                  maximumAmount: price.maximumAmount,
+                  presetAmount: price.presetAmount,
+                }
+              : {
+                  key: meterPriceKey(price.meterAddress),
+                  type: "meteredUnit" as const,
+                  meter: price.meterAddress,
+                  unitAmount: price.unitAmount,
+                  currency: price.priceCurrency,
+                  capAmount: price.capAmount,
+                },
+      ),
     };
 
     return {
       kind: "product",
       key: this.key,
       address: this.address,
-      dependencies: [],
+      dependencies: [...new Set(dependencies)],
       config: { managed },
     };
   }

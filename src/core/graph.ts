@@ -26,6 +26,33 @@ export const addResourceOperationDependencies = (
   });
 };
 
+const isDestructiveOperation = (operation: Operation): boolean =>
+  operation.action === "archive" || operation.action === "delete";
+
+const isConvergentOperation = (operation: Operation): boolean =>
+  operation.action === "create" || operation.action === "update" || operation.action === "unarchive";
+
+export const addConvergeBeforeDestroyDependencies = (
+  operations: ReadonlyArray<Operation>,
+): ReadonlyArray<Operation> => {
+  const convergentOperationIds = operations
+    .filter(isConvergentOperation)
+    .map((operation) => operation.id);
+
+  if (convergentOperationIds.length === 0) return operations;
+
+  return operations.map((operation) => {
+    if (!isDestructiveOperation(operation)) return operation;
+    return {
+      ...operation,
+      dependsOn: unique([
+        ...operation.dependsOn,
+        ...convergentOperationIds.filter((id) => id !== operation.id),
+      ]),
+    };
+  });
+};
+
 export const orderOperations = (
   operations: ReadonlyArray<Operation>,
 ): {

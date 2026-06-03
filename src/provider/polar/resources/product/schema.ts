@@ -35,10 +35,20 @@ export const CanonicalCustomProductPrice = Schema.Struct({
   presetAmount: Schema.NullOr(Schema.Number),
 });
 
+export const CanonicalMeteredUnitProductPrice = Schema.Struct({
+  key: Schema.String,
+  type: Schema.Literal("meteredUnit"),
+  meter: Schema.String,
+  unitAmount: Schema.Union([Schema.String, Schema.Number]),
+  currency: Schema.String,
+  capAmount: Schema.NullOr(Schema.Number),
+});
+
 export const CanonicalProductPrice = Schema.Union([
   CanonicalFixedProductPrice,
   CanonicalFreeProductPrice,
   CanonicalCustomProductPrice,
+  CanonicalMeteredUnitProductPrice,
 ]);
 
 export const ProductManagedV1 = Schema.Struct({
@@ -63,32 +73,53 @@ const RemotePriceArchiveState = Schema.Struct({
   isArchived: Schema.optionalKey(Schema.Boolean),
 });
 
+const RemotePriceIdentity = {
+  id: Schema.optionalKey(Schema.String),
+  isArchived: Schema.optionalKey(Schema.Boolean),
+} as const;
+
 const RemoteFixedProductPrice = Schema.Struct({
+  ...RemotePriceIdentity,
   amountType: Schema.Literal("fixed"),
   priceAmount: Schema.Number,
   priceCurrency: Schema.String,
-  isArchived: Schema.optionalKey(Schema.Boolean),
 });
 
 const RemoteFreeProductPrice = Schema.Struct({
+  ...RemotePriceIdentity,
   amountType: Schema.Literal("free"),
   priceCurrency: Schema.String,
-  isArchived: Schema.optionalKey(Schema.Boolean),
 });
 
 const RemoteCustomProductPrice = Schema.Struct({
+  ...RemotePriceIdentity,
   amountType: Schema.Literal("custom"),
   priceCurrency: Schema.String,
   minimumAmount: Schema.Number,
   maximumAmount: Schema.NullOr(Schema.Number),
   presetAmount: Schema.NullOr(Schema.Number),
-  isArchived: Schema.optionalKey(Schema.Boolean),
+});
+
+const RemoteMeteredUnitProductPrice = Schema.Struct({
+  ...RemotePriceIdentity,
+  amountType: Schema.Literal("metered_unit"),
+  priceCurrency: Schema.String,
+  unitAmount: Schema.Union([Schema.String, Schema.Number]),
+  capAmount: Schema.NullOr(Schema.Number),
+  meterId: Schema.String,
 });
 
 export const RemoteStaticProductPrice = Schema.Union([
   RemoteFixedProductPrice,
   RemoteFreeProductPrice,
   RemoteCustomProductPrice,
+]);
+
+export const RemoteSupportedProductPrice = Schema.Union([
+  RemoteFixedProductPrice,
+  RemoteFreeProductPrice,
+  RemoteCustomProductPrice,
+  RemoteMeteredUnitProductPrice,
 ]);
 
 export const RemoteProductV1 = Schema.Struct({
@@ -108,6 +139,7 @@ export type ProductDesiredConfig = typeof ProductDesiredConfig.Type;
 export type CanonicalProductPrice = typeof CanonicalProductPrice.Type;
 export type RemoteProductV1 = typeof RemoteProductV1.Type;
 export type RemoteStaticProductPrice = typeof RemoteStaticProductPrice.Type;
+export type RemoteSupportedProductPrice = typeof RemoteSupportedProductPrice.Type;
 export type RemoteProductPriceArchiveState = typeof RemotePriceArchiveState.Type;
 
 export const decodeProductDesiredConfig = Schema.decodeUnknownSync(ProductDesiredConfig, {
@@ -116,6 +148,10 @@ export const decodeProductDesiredConfig = Schema.decodeUnknownSync(ProductDesire
 export const decodeProductManagedV1 = Schema.decodeUnknownSync(ProductManagedV1);
 export const decodeRemoteProductV1 = Schema.decodeUnknownSync(RemoteProductV1);
 export const decodeRemoteStaticProductPrice = Schema.decodeUnknownSync(RemoteStaticProductPrice);
-export const decodeRemoteProductPriceArchiveState = Schema.decodeUnknownSync(RemotePriceArchiveState);
+export const decodeRemoteSupportedProductPrice = Schema.decodeUnknownSync(
+  RemoteSupportedProductPrice,
+);
+export const decodeRemoteProductPriceArchiveState =
+  Schema.decodeUnknownSync(RemotePriceArchiveState);
 
 export const productManagedJson = (managed: ProductManagedV1) => decodeJsonObject(managed);

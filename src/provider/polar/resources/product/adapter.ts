@@ -1,7 +1,11 @@
 import type { Product as RemoteProduct } from "@polar-sh/sdk/models/components/product.js";
 import * as Effect from "effect/Effect";
 import { decodeJsonObject } from "../../../../core/json.js";
-import { decodePaacMetadata, decodePaacMetadataResult, type ManagedIdentity } from "../../../../core/metadata.js";
+import {
+  decodePaacMetadata,
+  decodePaacMetadataResult,
+  type ManagedIdentity,
+} from "../../../../core/metadata.js";
 import type { ResourceAdapter } from "../../../../core/adapter.js";
 import { errorDiagnostic } from "../../../../core/diagnostic.js";
 import type { FieldSemantics } from "../../../../core/field-semantics.js";
@@ -10,12 +14,13 @@ import type { PolarClientShape } from "../../../../polar/service.js";
 import { planProductArchive, planProductCreate, planProductUpdate } from "./operations.js";
 import {
   decodeProductDesiredConfig,
-  decodeRemoteProductV1,
   decodeRemoteProductPriceArchiveState,
-  decodeRemoteStaticProductPrice,
+  decodeRemoteProductV1,
+  decodeRemoteSupportedProductPrice,
   productManagedJson,
   type CanonicalProductPrice,
-  type RemoteStaticProductPrice,
+  type RemoteProductV1,
+  type RemoteSupportedProductPrice,
 } from "./schema.js";
 
 export const productFieldSemantics: FieldSemantics = [
@@ -35,7 +40,14 @@ const identityForDesired = (desired: DesiredResource): ManagedIdentity => ({
   key: desired.key,
 });
 
-const remotePriceToCanonical = (price: RemoteStaticProductPrice): CanonicalProductPrice => {
+const meterPriceKey = (meterAddress: string): string =>
+  meterAddress.startsWith("meter.")
+    ? `meter:${meterAddress.slice("meter.".length)}`
+    : `meter:${meterAddress}`;
+
+const remoteStaticPriceToCanonical = (
+  price: RemoteSupportedProductPrice,
+): CanonicalProductPrice => {
   switch (price.amountType) {
     case "fixed":
       return {
@@ -59,6 +71,8 @@ const remotePriceToCanonical = (price: RemoteStaticProductPrice): CanonicalProdu
         maximumAmount: price.maximumAmount,
         presetAmount: price.presetAmount,
       };
+    case "metered_unit":
+      throw new Error("Metered prices require meter address resolution.");
   }
 };
 
@@ -70,37 +84,124 @@ const isActivePrice = (price: unknown): boolean => {
   }
 };
 
-const normalizeRemotePrice = (remote: ReturnType<typeof decodeRemoteProductV1>) =>
-  Effect.gen(function*() {
-    const activePrices = remote.prices.filter(isActivePrice);
-    if (activePrices.length !== 1) {
-      const identity = decodePaacMetadata(remote.metadata);
+type NormalizedPrices = {
+  readonly prices: ReadonlyArray<CanonicalProductPrice>;
+  readonly priceIdsByKey: Record<string, string>;
+};
+
+const managedMeterAddressesById = (polar: PolarClientShape) =>
+  Effect.gen(function* () {
+    const meters = yield* polar.listMeters();
+    const map = new Map<string, string>();
+    for (const meter of meters) {
+      const identity = decodePaacMetadata(meter.metadata);
+      if (identity?.kind === "meter") {
+        map.set(meter.id, identity.address);
+      }
+    }
+    return map;
+  });
+
+const normalizeRemotePrices = (
+  product: RemoteProductV1,
+  polar: PolarClientShape,
+): Effect.Effect<NormalizedPrices, ReturnType<typeof errorDiagnostic>, never> =>
+  Effect.gen(function* () {
+    const identity = decodePaacMetadata(product.metadata);
+    const activePrices = product.prices.filter(isActivePrice);
+    if (activePrices.length === 0) {
       return yield* Effect.fail(
         errorDiagnostic({
           code: "PAAC_UNSUPPORTED_REMOTE_SHAPE",
-          message:
-            "Remote product has unsupported pricing shape. This PAAC version supports exactly one active managed static Product Price.",
+          message: "Remote product has no active Product Prices.",
           ...(identity === undefined ? {} : { address: identity.address }),
           path: "/prices",
-          hint: "Archive or remove extra active prices until keyed Product Price imports are implemented.",
         }),
       );
     }
 
-    try {
-      return remotePriceToCanonical(decodeRemoteStaticProductPrice(activePrices[0]));
-    } catch {
-      const identity = decodePaacMetadata(remote.metadata);
+    const supportedPrices: Array<RemoteSupportedProductPrice> = [];
+    for (const price of activePrices) {
+      try {
+        supportedPrices.push(decodeRemoteSupportedProductPrice(price));
+      } catch {
+        return yield* Effect.fail(
+          errorDiagnostic({
+            code: "PAAC_UNSUPPORTED_REMOTE_SHAPE",
+            message:
+              "Remote active product price is not a supported fixed, free, custom, or metered Product Price.",
+            ...(identity === undefined ? {} : { address: identity.address }),
+            path: "/prices",
+          }),
+        );
+      }
+    }
+
+    const staticPrices = supportedPrices.filter((price) => price.amountType !== "metered_unit");
+    if (staticPrices.length > 1) {
       return yield* Effect.fail(
         errorDiagnostic({
           code: "PAAC_UNSUPPORTED_REMOTE_SHAPE",
           message:
-            "Remote active product price is not a supported static fixed, free, or custom Product Price.",
+            "Remote product has unsupported pricing shape. PAAC supports at most one active static Product Price and any number of active metered Product Prices.",
           ...(identity === undefined ? {} : { address: identity.address }),
-          path: "/prices/base",
+          path: "/prices",
+          hint: "Archive or remove extra active static prices until keyed Product Price imports are implemented.",
         }),
       );
     }
+
+    const meterAddressesById = supportedPrices.some((price) => price.amountType === "metered_unit")
+      ? yield* managedMeterAddressesById(polar).pipe(
+          Effect.mapError((error) =>
+            errorDiagnostic({
+              code: "PAAC_METER_LOOKUP_FAILED",
+              message: `Failed to list Polar meters while normalizing Product prices: ${error.message}`,
+              ...(identity === undefined ? {} : { address: identity.address }),
+              path: "/prices",
+            }),
+          ),
+        )
+      : new Map<string, string>();
+
+    const prices: Array<CanonicalProductPrice> = [];
+    const priceIdsByKey: Record<string, string> = {};
+
+    for (const price of supportedPrices) {
+      const canonical =
+        price.amountType === "metered_unit"
+          ? (() => {
+              const meterAddress = meterAddressesById.get(price.meterId);
+              if (meterAddress === undefined) return undefined;
+              return {
+                key: meterPriceKey(meterAddress),
+                type: "meteredUnit" as const,
+                meter: meterAddress,
+                unitAmount: price.unitAmount,
+                currency: price.priceCurrency.toLowerCase(),
+                capAmount: price.capAmount,
+              };
+            })()
+          : remoteStaticPriceToCanonical(price);
+
+      if (canonical === undefined) {
+        return yield* Effect.fail(
+          errorDiagnostic({
+            code: "PAAC_UNSUPPORTED_REMOTE_SHAPE",
+            message: "Remote metered Product Price references a Meter not managed by PAAC.",
+            ...(identity === undefined ? {} : { address: identity.address }),
+            path: "/prices",
+          }),
+        );
+      }
+
+      prices.push(canonical);
+      if (price.id !== undefined) {
+        priceIdsByKey[canonical.key] = price.id;
+      }
+    }
+
+    return { prices, priceIdsByKey };
   });
 
 export const makeProductAdapter = (polar: PolarClientShape): ResourceAdapter<RemoteProduct> => ({
@@ -109,7 +210,7 @@ export const makeProductAdapter = (polar: PolarClientShape): ResourceAdapter<Rem
   getRemoteIdentity: (remote) => decodePaacMetadataResult(remote.metadata),
   fieldSemantics: productFieldSemantics,
   normalizeDesired: (desired) =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       try {
         const config = decodeProductDesiredConfig(desired.config);
         return {
@@ -131,7 +232,7 @@ export const makeProductAdapter = (polar: PolarClientShape): ResourceAdapter<Rem
       }
     }),
   normalizeRemote: (remote) =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       let product: ReturnType<typeof decodeRemoteProductV1>;
       try {
         product = decodeRemoteProductV1(remote);
@@ -140,7 +241,8 @@ export const makeProductAdapter = (polar: PolarClientShape): ResourceAdapter<Rem
         return yield* Effect.fail(
           errorDiagnostic({
             code: "PAAC_UNSUPPORTED_REMOTE_SHAPE",
-            message: "Remote product does not match the Polar product schema supported by this adapter.",
+            message:
+              "Remote product does not match the Polar product schema supported by this adapter.",
             ...(identity === undefined ? {} : { address: identity.address }),
           }),
         );
@@ -165,7 +267,7 @@ export const makeProductAdapter = (polar: PolarClientShape): ResourceAdapter<Rem
         );
       }
 
-      const price = yield* normalizeRemotePrice(product);
+      const normalizedPrices = yield* normalizeRemotePrices(product, polar);
       return {
         kind: "product",
         address: identity.address,
@@ -180,10 +282,10 @@ export const makeProductAdapter = (polar: PolarClientShape): ResourceAdapter<Rem
             recurringInterval: product.recurringInterval,
             recurringIntervalCount: product.recurringIntervalCount,
           },
-          prices: [price],
+          prices: normalizedPrices.prices,
         }),
         metadata: identity,
-        raw: remote,
+        raw: { product: remote, priceIdsByKey: normalizedPrices.priceIdsByKey },
       } satisfies CanonicalResource;
     }),
   planCreate: (resource) => planProductCreate(resource),

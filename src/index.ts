@@ -1,8 +1,48 @@
-export { Product, customPrice, fixedPrice, freePrice } from "./resources/product.js";
+export {
+  Meter,
+  aggregate,
+  and,
+  avg,
+  count,
+  eventName,
+  eventTimestamp,
+  max,
+  metadata,
+  min,
+  or,
+  sum,
+  unique,
+  where,
+} from "./resources/meter.js";
+export type {
+  AggregationFunction,
+  CountAggregation,
+  CountAggregationFunction,
+  MeterAggregation,
+  MeterConfig,
+  MeterFilter,
+  MeterFilterClause,
+  MeterFilterConjunction,
+  MeterFilterOperator,
+  MeterFilterValue,
+  MeterTimestampFilterValue,
+  PropertyAggregation,
+  PropertyAggregationFunction,
+  UniqueAggregation,
+  UniqueAggregationFunction,
+} from "./resources/meter.js";
+export {
+  Product,
+  customPrice,
+  fixedPrice,
+  freePrice,
+  meteredUnitPrice,
+} from "./resources/product.js";
 export type {
   CustomPriceConfig,
   FixedPriceConfig,
   FreePriceConfig,
+  MeteredUnitPriceConfig,
   ProductConfig,
   ProductPriceConfig,
 } from "./resources/product.js";

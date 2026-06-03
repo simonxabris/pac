@@ -25,8 +25,12 @@ A single Polar metadata key named `paac` containing versioned JSON that identifi
 _Avoid_: Flat metadata keys, project metadata
 
 **Product Price**:
-A price option declared as part of a Product. Product Prices are not standalone resources in PAAC's language; users change them by changing the Product declaration. The first supported Product Price forms are Polar's static prices: fixed, free, and custom.
+A price option declared as part of a Product. Product Prices are not standalone resources in PAAC's language; users change them by changing the Product declaration. Supported Product Price forms are Polar's static prices (fixed, free, and custom) and recurring metered unit prices.
 _Avoid_: Price resource, standalone price, detached price
+
+**Metered Product Price**:
+A recurring Product Price that charges a fixed unit amount for usage recorded by a PAAC-managed Meter. A Product with a Metered Product Price depends on the referenced Meter.
+_Avoid_: Standalone meter price, usage resource
 
 **Product Visibility**:
 The Polar visibility state of a Product: `draft`, `private`, or `public`.
@@ -39,3 +43,19 @@ _Avoid_: Billing period, subscription period
 **Archived Product**:
 A Product that still exists in Polar but is no longer available for new purchases. Existing customer access and subscriptions are not erased by archiving.
 _Avoid_: Deleted product, removed product
+
+**Meter**:
+A standalone Polar usage counter declared as a PAAC resource, such as `meter.api-calls`. Meters define which events count and how those events are aggregated. Wiring Meters into metered Product Prices is a separate Product Price concern.
+_Avoid_: Usage price, event, counter field
+
+**Meter Filter**:
+The event selection logic for a Meter, composed from filter clauses and `and`/`or` groups. PAAC uses explicit helpers for Polar event fields: `eventName(...)` filters the event name, `eventTimestamp(...)` filters the event timestamp, and `metadata(...)` filters event metadata properties.
+_Avoid_: Query, selector
+
+**Meter Aggregation**:
+The calculation a Meter applies to filtered events: count, sum, avg, min, max, or unique.
+_Avoid_: Formula, metric type
+
+**Archived Meter**:
+A Meter that still exists in Polar but is no longer used for billing. PAAC archives missing Meter declarations rather than deleting them.
+_Avoid_: Deleted meter, removed meter

@@ -9,7 +9,7 @@ import { errorDiagnostic, type Diagnostic } from "./diagnostic.js";
 import { diffJson, type FieldDiff } from "./diff.js";
 import type { FieldRule } from "./field-semantics.js";
 import type { ManagedIdentity } from "./metadata.js";
-import { addResourceOperationDependencies, orderOperations } from "./graph.js";
+import { addConvergeBeforeDestroyDependencies, addResourceOperationDependencies, orderOperations } from "./graph.js";
 import { type Operation, type Plan, type ResourceAction, type ResourceChange, summarizeChanges } from "./plan.js";
 import type { CanonicalResource, DesiredResource } from "./resource.js";
 
@@ -322,9 +322,11 @@ export class Planner extends Context.Service<Planner, PlannerShape>()("@paac/Pla
 
         const planned = yield* operationPlanner(registry, changes);
         diagnostics.push(...planned.diagnostics);
-        const operationsWithDependencies = addResourceOperationDependencies(
-          planned.changes,
-          planned.operations,
+        const operationsWithDependencies = addConvergeBeforeDestroyDependencies(
+          addResourceOperationDependencies(
+            planned.changes,
+            planned.operations,
+          ),
         );
         const ordered = orderOperations(operationsWithDependencies);
         diagnostics.push(...ordered.diagnostics);
