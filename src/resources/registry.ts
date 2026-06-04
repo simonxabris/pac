@@ -1,7 +1,8 @@
 import type { ResourceAddress } from "../core/address.js";
+import type { ResourceKind } from "../core/kind.js";
 import type { DesiredResource } from "../core/resource.js";
 
-export type Resource<Kind extends string = string, Spec = unknown> = {
+export type Resource<Kind extends ResourceKind = ResourceKind, Spec = unknown> = {
   readonly type: Kind;
   readonly kind: Kind;
   readonly key: string;

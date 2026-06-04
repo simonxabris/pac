@@ -54,11 +54,13 @@ export type ProductFixedPriceSpec = {
   readonly type: "fixed";
   readonly amount: string;
   readonly currency: string;
+  readonly capAmount?: never;
 };
 
 export type ProductFreePriceSpec = {
   readonly type: "free";
   readonly currency: string;
+  readonly capAmount?: never;
 };
 
 export type ProductCustomPriceSpec = {
@@ -67,6 +69,7 @@ export type ProductCustomPriceSpec = {
   readonly minimumAmount: string | null;
   readonly maximumAmount: string | null;
   readonly presetAmount: string | null;
+  readonly capAmount?: never;
 };
 
 export type ProductMeteredUnitPriceSpec = {

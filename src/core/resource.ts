@@ -1,10 +1,11 @@
 import type { ResourceAddress } from "./address.js";
+import type { ResourceKind } from "./kind.js";
 
 export type ResourceSource = "desired" | "current";
 
 export type ResourceEnvelope<
   Source extends ResourceSource = ResourceSource,
-  Kind extends string = string,
+  Kind extends ResourceKind = ResourceKind,
   Spec = unknown,
 > = {
   readonly source: Source;
@@ -14,13 +15,13 @@ export type ResourceEnvelope<
   readonly spec: Spec;
 };
 
-export type DesiredResource<Kind extends string = string, Spec = unknown> = ResourceEnvelope<
+export type DesiredResource<Kind extends ResourceKind = ResourceKind, Spec = unknown> = ResourceEnvelope<
   "desired",
   Kind,
   Spec
 >;
 
-export type CurrentResource<Kind extends string = string, Spec = unknown> = ResourceEnvelope<
+export type CurrentResource<Kind extends ResourceKind = ResourceKind, Spec = unknown> = ResourceEnvelope<
   "current",
   Kind,
   Spec

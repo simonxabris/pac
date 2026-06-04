@@ -1,4 +1,5 @@
 export type { ResourceAddress } from "./core/address.js";
+export type { ResourceKind } from "./core/kind.js";
 export type {
   CurrentResource,
   DesiredResource,

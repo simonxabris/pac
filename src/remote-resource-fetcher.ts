@@ -2,12 +2,14 @@ import { Effect, Layer, Option, Schema, SchemaGetter, SchemaIssue } from "effect
 import * as Context from "effect/Context";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
 import type { CurrentResource } from "./core/resource.js";
+import { PolarClient } from "./polar/service.js";
 import {
   CurrentMeterResourceSchema,
   MeterAddressSchema,
   MeterAggregationSpecSchema,
   MeterFilterSpecSchema,
   type CurrentMeterResource,
+  type MeterAddress,
 } from "./resources/meter.js";
 import {
   CurrentProductResourceSchema,
@@ -78,9 +80,18 @@ const RemoteProductSdk = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.NullOr(Schema.String),
-  visibility: Schema.Union([Schema.Literal("draft"), Schema.Literal("private"), Schema.Literal("public")]),
+  visibility: Schema.Union([
+    Schema.Literal("draft"),
+    Schema.Literal("private"),
+    Schema.Literal("public"),
+  ]),
   recurringInterval: Schema.NullOr(
-    Schema.Union([Schema.Literal("day"), Schema.Literal("week"), Schema.Literal("month"), Schema.Literal("year")]),
+    Schema.Union([
+      Schema.Literal("day"),
+      Schema.Literal("week"),
+      Schema.Literal("month"),
+      Schema.Literal("year"),
+    ]),
   ),
   recurringIntervalCount: Schema.NullOr(Schema.Number),
   metadata: MetadataRecord,
@@ -106,6 +117,16 @@ const RemoteMeterSdk = Schema.Struct({
 const schemaIssue = (actual: unknown, message: string): SchemaIssue.Issue =>
   new SchemaIssue.InvalidValue(Option.some(actual), { message });
 
+const errorMessage = (cause: unknown): string => {
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === "string") return cause;
+  return String(cause);
+};
+
+const hasPaacMetadata = (remote: {
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}): boolean => remote.metadata?.paac !== undefined;
+
 const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
   const value = metadata.paac;
   if (typeof value !== "string") {
@@ -125,7 +146,10 @@ const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIden
   };
 };
 
-const identityForKind = (kind: "product" | "meter", metadata: typeof MetadataRecord.Type): ManagedIdentity => {
+const identityForKind = (
+  kind: "product" | "meter",
+  metadata: typeof MetadataRecord.Type,
+): ManagedIdentity => {
   const identity = parseManagedIdentity(metadata);
   if (identity.kind !== kind) {
     throw new Error(`Expected PAAC metadata kind '${kind}', got '${identity.kind}'.`);
@@ -135,7 +159,8 @@ const identityForKind = (kind: "product" | "meter", metadata: typeof MetadataRec
 
 const currency = (value: string): string => value.toLowerCase();
 const amount = (value: string | number): string => String(value);
-const optionalAmount = (value: number | null): string | null => value === null ? null : String(value);
+const optionalAmount = (value: number | null): string | null =>
+  value === null ? null : String(value);
 
 const productPriceToSpec = (
   price: RemoteProductPrice,
@@ -143,7 +168,11 @@ const productPriceToSpec = (
 ): ProductPriceSpec => {
   switch (price.amountType) {
     case "fixed":
-      return { type: "fixed", amount: amount(price.priceAmount), currency: currency(price.priceCurrency) };
+      return {
+        type: "fixed",
+        amount: amount(price.priceAmount),
+        currency: currency(price.priceCurrency),
+      };
     case "free":
       return { type: "free", currency: currency(price.priceCurrency) };
     case "custom":
@@ -157,7 +186,9 @@ const productPriceToSpec = (
     case "metered_unit": {
       const meterAddress = meterAddressesById[price.meterId];
       if (meterAddress === undefined) {
-        throw new Error(`Metered product price references unmanaged or unknown meter '${price.meterId}'.`);
+        throw new Error(
+          `Metered product price references unmanaged or unknown meter '${price.meterId}'.`,
+        );
       }
       return {
         type: "meteredUnit",
@@ -189,13 +220,16 @@ const productToCurrentResource = ({
         .map((price) => productPriceToSpec(price, meterAddressesById)),
       visibility: product.visibility,
       recurringInterval: product.recurringInterval,
-      recurringIntervalCount: product.recurringInterval === null ? null : product.recurringIntervalCount ?? 1,
+      recurringIntervalCount:
+        product.recurringInterval === null ? null : (product.recurringIntervalCount ?? 1),
     },
     raw: product,
   };
 };
 
-const productResourceToRemoteInput = (resource: CurrentProductResource): typeof RemoteProductResourceInput.Type => ({
+const productResourceToRemoteInput = (
+  resource: CurrentProductResource,
+): typeof RemoteProductResourceInput.Type => ({
   product: {
     id: resource.polarId,
     name: resource.spec.name,
@@ -207,7 +241,12 @@ const productResourceToRemoteInput = (resource: CurrentProductResource): typeof 
     prices: resource.spec.prices.map((price) => {
       switch (price.type) {
         case "fixed":
-          return { amountType: "fixed", priceAmount: Number(price.amount), priceCurrency: price.currency, isArchived: false };
+          return {
+            amountType: "fixed",
+            priceAmount: Number(price.amount),
+            priceCurrency: price.currency,
+            isArchived: false,
+          };
         case "free":
           return { amountType: "free", priceCurrency: price.currency, isArchived: false };
         case "custom":
@@ -270,7 +309,8 @@ export const RemoteProductResourceSchema = RemoteProductResourceInput.pipe(
     decode: SchemaGetter.transformOrFail((input) =>
       Effect.try({
         try: () => productToCurrentResource(input),
-        catch: (cause) => schemaIssue(input, cause instanceof Error ? cause.message : String(cause)),
+        catch: (cause) =>
+          schemaIssue(input, cause instanceof Error ? cause.message : String(cause)),
       }),
     ),
     encode: SchemaGetter.transform(productResourceToRemoteInput),
@@ -282,7 +322,8 @@ export const RemoteMeterResourceSchema = RemoteMeterSdk.pipe(
     decode: SchemaGetter.transformOrFail((meter) =>
       Effect.try({
         try: () => meterToCurrentResource(meter),
-        catch: (cause) => schemaIssue(meter, cause instanceof Error ? cause.message : String(cause)),
+        catch: (cause) =>
+          schemaIssue(meter, cause instanceof Error ? cause.message : String(cause)),
       }),
     ),
     encode: SchemaGetter.transform(meterResourceToRemote),
@@ -297,22 +338,97 @@ export class RemoteResourceFetchError extends Schema.TaggedErrorClass<RemoteReso
   {
     message: Schema.String,
   },
-) {}
+) { }
 
 export class DuplicateRemoteResourceAddress extends Schema.TaggedErrorClass<DuplicateRemoteResourceAddress>()(
   "DuplicateRemoteResourceAddress",
   {
     address: ResourceAddressSchema,
   },
-) {}
+) { }
+
+const putRemoteResource = (
+  map: Map<ResourceAddress, CurrentResource>,
+  resource: CurrentResource,
+): Effect.Effect<void, DuplicateRemoteResourceAddress> => {
+  if (map.has(resource.address)) {
+    return Effect.fail(new DuplicateRemoteResourceAddress({ address: resource.address }));
+  }
+  map.set(resource.address, resource);
+  return Effect.void;
+};
 
 export class RemoteResourceFetcher extends Context.Service<
   RemoteResourceFetcher,
   {
-    readonly fetch: () => Effect.Effect<RemoteResourceMap, RemoteResourceFetchError | DuplicateRemoteResourceAddress>;
+    readonly fetch: () => Effect.Effect<
+      RemoteResourceMap,
+      RemoteResourceFetchError | DuplicateRemoteResourceAddress
+    >;
   }
 >()("@app/RemoteResourceFetcher") {
-  static readonly layer = Layer.sync(RemoteResourceFetcher, () => ({
-    fetch: () => Effect.succeed(new Map<ResourceAddress, CurrentResource>()),
-  }));
+  static readonly layer = Layer.effect(
+    RemoteResourceFetcher,
+    Effect.gen(function*() {
+      const polar = yield* PolarClient;
+
+      return RemoteResourceFetcher.of({
+        fetch: () =>
+          Effect.gen(function*() {
+            const [remoteProducts, remoteMeters] = yield* Effect.all(
+              [polar.listProducts(), polar.listMeters()] as const,
+              { concurrency: "unbounded" },
+            ).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new RemoteResourceFetchError({
+                    message: `Failed to fetch Polar resources: ${errorMessage(cause)}`,
+                  }),
+              ),
+            );
+
+            const meters = yield* Effect.forEach(
+              remoteMeters.filter(hasPaacMetadata),
+              (meter) =>
+                decodeRemoteMeterResource(meter).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new RemoteResourceFetchError({
+                        message: `Failed to decode remote meter: ${errorMessage(cause)}`,
+                      }),
+                  ),
+                ),
+              { concurrency: "unbounded" },
+            );
+
+            const meterAddressesById = Object.fromEntries(
+              meters.map((meter) => [meter.polarId, meter.address]),
+            ) as Record<string, MeterAddress>;
+
+            const products = yield* Effect.forEach(
+              remoteProducts.filter(hasPaacMetadata),
+              (product) =>
+                decodeRemoteProductResource({ product, meterAddressesById }).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new RemoteResourceFetchError({
+                        message: `Failed to decode remote product: ${errorMessage(cause)}`,
+                      }),
+                  ),
+                ),
+              { concurrency: "unbounded" },
+            );
+
+            const resources = new Map<ResourceAddress, CurrentResource>();
+            yield* Effect.forEach(
+              [...meters, ...products],
+              (resource) => putRemoteResource(resources, resource),
+              { discard: true },
+            );
+
+            return resources;
+          }),
+      });
+    }),
+  );
 }

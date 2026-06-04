@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
+import type { ResourceKind } from "./kind.js";
 
-export type ResourceAddress<Kind extends string = string> = `${Kind}.${string}`;
+export type ResourceAddress<Kind extends ResourceKind = ResourceKind> = `${Kind}.${string}`;
 
 export type ParsedAddress = {
   readonly kind: string;
@@ -27,5 +28,5 @@ export const ResourceAddress = Schema.String.check(
 export const decodeResourceKey = Schema.decodeUnknownSync(ResourceKey);
 export const decodeResourceAddress = Schema.decodeUnknownSync(ResourceAddress);
 
-export const makeAddress = <const Kind extends string>(kind: Kind, key: string): ResourceAddress<Kind> =>
+export const makeAddress = <const Kind extends ResourceKind>(kind: Kind, key: string): ResourceAddress<Kind> =>
   decodeResourceAddress(`${decodeResourceKey(kind)}.${decodeResourceKey(key)}`) as ResourceAddress<Kind>;
