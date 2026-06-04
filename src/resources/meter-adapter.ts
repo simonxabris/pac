@@ -3,7 +3,8 @@ import type { FieldChange } from "../planner.js";
 import type { ResourceAdapter } from "../resource-adapter-registry.js";
 import type { MeterKind, MeterSpec } from "./meter.js";
 
-const valuesEqual = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+const valuesEqual = (left: unknown, right: unknown): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
 
 const pushFieldChange = (
   changes: Array<FieldChange>,
@@ -32,7 +33,12 @@ export const MeterResourceAdapter: ResourceAdapter<MeterKind, MeterSpec> = {
       pushFieldChange(changes, ["name"], current.spec.name, desired.spec.name);
       pushFieldChange(changes, ["unit"], current.spec.unit, desired.spec.unit);
       pushFieldChange(changes, ["customLabel"], current.spec.customLabel, desired.spec.customLabel);
-      pushFieldChange(changes, ["customMultiplier"], current.spec.customMultiplier, desired.spec.customMultiplier);
+      pushFieldChange(
+        changes,
+        ["customMultiplier"],
+        current.spec.customMultiplier,
+        desired.spec.customMultiplier,
+      );
       pushFieldChange(changes, ["filter"], current.spec.filter, desired.spec.filter);
       pushFieldChange(changes, ["aggregation"], current.spec.aggregation, desired.spec.aggregation);
 

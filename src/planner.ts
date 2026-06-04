@@ -40,6 +40,7 @@ export type Diagnostic = {
   readonly message: string;
   readonly address?: ResourceAddress;
   readonly path?: ReadonlyArray<string | number>;
+  readonly relatedAddresses?: ReadonlyArray<ResourceAddress>;
 };
 
 export type UpdatePlanNode = {
@@ -74,19 +75,24 @@ export type BlockedPlanNode = {
   readonly current?: CurrentResource;
 };
 
-export type PlanNode = CreatePlanNode | UpdatePlanNode | ArchivePlanNode | NoopPlanNode | BlockedPlanNode;
+export type PlanNode =
+  | CreatePlanNode
+  | UpdatePlanNode
+  | ArchivePlanNode
+  | NoopPlanNode
+  | BlockedPlanNode;
 
 export type ResourceDiffResult =
   | {
-      readonly _tag: "Planned";
-      readonly node: UpdatePlanNode | NoopPlanNode;
-      readonly diagnostics: ReadonlyArray<Diagnostic>;
-    }
+    readonly _tag: "Planned";
+    readonly node: UpdatePlanNode | NoopPlanNode;
+    readonly diagnostics: ReadonlyArray<Diagnostic>;
+  }
   | {
-      readonly _tag: "Blocked";
-      readonly node: BlockedPlanNode;
-      readonly diagnostics: ReadonlyArray<Diagnostic>;
-    };
+    readonly _tag: "Blocked";
+    readonly node: BlockedPlanNode;
+    readonly diagnostics: ReadonlyArray<Diagnostic>;
+  };
 
 export type PlanNodeMap = ReadonlyMap<ResourceAddress, PlanNode>;
 
@@ -94,6 +100,72 @@ export type PlanEdge = {
   readonly _tag: "DependsOn";
   readonly from: ResourceAddress;
   readonly to: ResourceAddress;
+};
+
+type PendingDependency = {
+  readonly from: ResourceAddress;
+  readonly to: ResourceAddress;
+  readonly basis: "desired" | "current";
+};
+
+const cycleKey = (cycle: ReadonlyArray<ResourceAddress>): string => {
+  const cycleWithoutRepeatedStart = cycle.slice(0, -1);
+  const rotations = cycleWithoutRepeatedStart.map((_, index) => [
+    ...cycleWithoutRepeatedStart.slice(index),
+    ...cycleWithoutRepeatedStart.slice(0, index),
+  ].join("->"));
+
+  return rotations.sort()[0] ?? cycle.join("->");
+};
+
+const findDependencyCycles = (
+  nodes: ReadonlyMap<ResourceAddress, PlanNode>,
+  edges: ReadonlyArray<PlanEdge>,
+): ReadonlyArray<ReadonlyArray<ResourceAddress>> => {
+  const adjacency = new Map<ResourceAddress, Array<ResourceAddress>>();
+
+  for (const address of nodes.keys()) {
+    adjacency.set(address, []);
+  }
+
+  for (const edge of edges) {
+    adjacency.get(edge.from)?.push(edge.to);
+  }
+
+  const visited = new Set<ResourceAddress>();
+  const stack: Array<ResourceAddress> = [];
+  const stackIndex = new Map<ResourceAddress, number>();
+  const cycles = new Map<string, ReadonlyArray<ResourceAddress>>();
+
+  const visit = (address: ResourceAddress) => {
+    visited.add(address);
+    stackIndex.set(address, stack.length);
+    stack.push(address);
+
+    for (const dependency of adjacency.get(address) ?? []) {
+      const dependencyStackIndex = stackIndex.get(dependency);
+      if (dependencyStackIndex !== undefined) {
+        const cycle = [...stack.slice(dependencyStackIndex), dependency];
+        cycles.set(cycleKey(cycle), cycle);
+        continue;
+      }
+
+      if (!visited.has(dependency)) {
+        visit(dependency);
+      }
+    }
+
+    stack.pop();
+    stackIndex.delete(address);
+  };
+
+  for (const address of nodes.keys()) {
+    if (!visited.has(address)) {
+      visit(address);
+    }
+  }
+
+  return [...cycles.values()];
 };
 
 export type Plan = {
@@ -182,12 +254,49 @@ export class Planner extends Context.Service<
             const nodes = new Map<ResourceAddress, PlanNode>();
             const edges: Array<PlanEdge> = [];
             const diagnostics: Array<Diagnostic> = [];
+            const pendingDependencies: Array<PendingDependency> = [];
             const edgeKeys = new Set<string>();
             const addDependencyEdge = (from: ResourceAddress, to: ResourceAddress) => {
+              if (!nodes.has(from) || !nodes.has(to)) return;
+
               const key = `${from}->${to}`;
               if (edgeKeys.has(key)) return;
               edgeKeys.add(key);
               edges.push({ _tag: "DependsOn", from, to });
+            };
+
+            const blockNode = (address: ResourceAddress) => {
+              const node = nodes.get(address);
+              if (node === undefined || node._tag === "Blocked") return;
+
+              switch (node._tag) {
+                case "Create":
+                  nodes.set(address, {
+                    _tag: "Blocked",
+                    address: node.address,
+                    kind: node.kind,
+                    desired: node.desired,
+                  });
+                  return;
+                case "Update":
+                case "Noop":
+                  nodes.set(address, {
+                    _tag: "Blocked",
+                    address: node.address,
+                    kind: node.kind,
+                    desired: node.desired,
+                    current: node.current,
+                  });
+                  return;
+                case "Archive":
+                  nodes.set(address, {
+                    _tag: "Blocked",
+                    address: node.address,
+                    kind: node.kind,
+                    current: node.current,
+                  });
+                  return;
+              }
             };
 
             for (const [address, desiredResource] of desiredResourcesByAddress.entries()) {
@@ -195,7 +304,7 @@ export class Planner extends Context.Service<
               const dependencies = yield* adapter.dependencies(desiredResource);
 
               for (const dependency of dependencies) {
-                addDependencyEdge(address, dependency);
+                pendingDependencies.push({ from: address, to: dependency, basis: "desired" });
               }
 
               const currentResource = currentResourcesByAddress.get(desiredResource.address);
@@ -211,21 +320,22 @@ export class Planner extends Context.Service<
               }
 
               const diffResult = yield* adapter.diff(desiredResource, currentResource);
+
               diagnostics.push(...diffResult.diagnostics);
 
               nodes.set(address, diffResult.node);
             }
 
             for (const [address, currentResource] of currentResourcesByAddress.entries()) {
+              if (desiredResourcesByAddress.has(address)) {
+                continue;
+              }
+
               const adapter = yield* adapterRegistry.get(currentResource.kind);
               const dependencies = yield* adapter.dependencies(currentResource);
 
               for (const dependency of dependencies) {
-                addDependencyEdge(address, dependency);
-              }
-
-              if (desiredResourcesByAddress.has(address)) {
-                continue;
+                pendingDependencies.push({ from: address, to: dependency, basis: "current" });
               }
 
               nodes.set(address, {
@@ -234,6 +344,54 @@ export class Planner extends Context.Service<
                 kind: currentResource.kind,
                 current: currentResource,
               });
+            }
+
+            for (const dependency of pendingDependencies) {
+              if (dependency.basis === "desired") {
+                if (!desiredResourcesByAddress.has(dependency.to)) {
+                  diagnostics.push({
+                    _tag: "Diagnostic",
+                    severity: "error",
+                    code: "dependency.missing",
+                    address: dependency.from,
+                    message: `Resource ${dependency.from} depends on missing desired resource ${dependency.to}.`,
+                  });
+                  blockNode(dependency.from);
+                  continue;
+                }
+
+                addDependencyEdge(dependency.from, dependency.to);
+                continue;
+              }
+
+              if (!currentResourcesByAddress.has(dependency.to)) {
+                diagnostics.push({
+                  _tag: "Diagnostic",
+                  severity: "warning",
+                  code: "dependency.currentTargetMissing",
+                  address: dependency.from,
+                  message: `Current resource ${dependency.from} depends on missing current resource ${dependency.to}.`,
+                });
+                continue;
+              }
+
+              addDependencyEdge(dependency.from, dependency.to);
+            }
+
+            for (const cycle of findDependencyCycles(nodes, edges)) {
+              const cycleNodes = cycle.slice(0, -1);
+
+              diagnostics.push({
+                _tag: "Diagnostic",
+                severity: "error",
+                code: "dependency.cycle",
+                message: `Dependency cycle detected: ${cycle.join(" -> ")}.`,
+                relatedAddresses: cycle,
+              });
+
+              for (const address of cycleNodes) {
+                blockNode(address);
+              }
             }
 
             return {
