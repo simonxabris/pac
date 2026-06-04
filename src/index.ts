@@ -1,3 +1,11 @@
+export type { ResourceAddress } from "./core/address.js";
+export type {
+  CurrentResource,
+  DesiredResource,
+  ResourceEnvelope,
+  ResourceSource,
+} from "./core/resource.js";
+
 export {
   Meter,
   aggregate,
@@ -18,13 +26,21 @@ export type {
   AggregationFunction,
   CountAggregation,
   CountAggregationFunction,
+  CurrentMeterResource,
+  MeterAddress,
   MeterAggregation,
+  MeterAggregationSpec,
   MeterConfig,
   MeterFilter,
   MeterFilterClause,
+  MeterFilterClauseSpec,
   MeterFilterConjunction,
   MeterFilterOperator,
+  MeterFilterSpec,
   MeterFilterValue,
+  MeterKind,
+  MeterResource,
+  MeterSpec,
   MeterTimestampFilterValue,
   PropertyAggregation,
   PropertyAggregationFunction,
@@ -39,10 +55,20 @@ export {
   meteredUnitPrice,
 } from "./resources/product.js";
 export type {
+  CurrentProductResource,
   CustomPriceConfig,
   FixedPriceConfig,
   FreePriceConfig,
   MeteredUnitPriceConfig,
+  ProductAddress,
   ProductConfig,
+  ProductCustomPriceSpec,
+  ProductFixedPriceSpec,
+  ProductFreePriceSpec,
+  ProductKind,
+  ProductMeteredUnitPriceSpec,
   ProductPriceConfig,
+  ProductPriceSpec,
+  ProductResource,
+  ProductSpec,
 } from "./resources/product.js";

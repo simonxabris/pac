@@ -2,44 +2,67 @@ import { Polar } from "@polar-sh/sdk";
 import type { MeterCreate } from "@polar-sh/sdk/models/components/metercreate.js";
 import type { MeterUpdate } from "@polar-sh/sdk/models/components/meterupdate.js";
 import type { ProductCreate } from "@polar-sh/sdk/models/components/productcreate.js";
+import type { ProductBenefitsUpdate } from "@polar-sh/sdk/models/components/productbenefitsupdate.js";
 import type { ProductUpdate } from "@polar-sh/sdk/models/components/productupdate.js";
+import { Effect, Layer, Redacted, Schema } from "effect";
 import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
 import { AppConfig } from "../config/service.js";
-import type { MeterCreatePayload, MeterUpdatePayload } from "../resources/meter.js";
-import type { ProductCreatePayload, ProductUpdatePayload } from "../resources/product.js";
 import type { RemoteMeter, RemoteProduct } from "./client.js";
 
 export type PolarClientShape = {
-  readonly listProducts: () => Effect.Effect<ReadonlyArray<RemoteProduct>, Error>;
-  readonly createProduct: (payload: ProductCreatePayload) => Effect.Effect<void>;
-  readonly updateProduct: (id: string, payload: ProductUpdatePayload) => Effect.Effect<void>;
-  readonly archiveProduct: (id: string) => Effect.Effect<void>;
-  readonly listMeters: () => Effect.Effect<ReadonlyArray<RemoteMeter>, Error>;
-  readonly createMeter: (payload: MeterCreatePayload) => Effect.Effect<void>;
-  readonly updateMeter: (id: string, payload: MeterUpdatePayload) => Effect.Effect<void>;
-  readonly archiveMeter: (id: string) => Effect.Effect<void>;
+  readonly listProducts: () => Effect.Effect<ReadonlyArray<RemoteProduct>, PolarClientError>;
+  readonly createProduct: (payload: ProductCreate) => Effect.Effect<RemoteProduct, PolarClientError>;
+  readonly updateProduct: (id: string, payload: ProductUpdate) => Effect.Effect<RemoteProduct, PolarClientError>;
+  readonly archiveProduct: (id: string) => Effect.Effect<RemoteProduct, PolarClientError>;
+  readonly updateProductBenefits: (
+    id: string,
+    benefitIds: ReadonlyArray<string>,
+  ) => Effect.Effect<RemoteProduct, PolarClientError>;
+  readonly listMeters: () => Effect.Effect<ReadonlyArray<RemoteMeter>, PolarClientError>;
+  readonly createMeter: (payload: MeterCreate) => Effect.Effect<RemoteMeter, PolarClientError>;
+  readonly updateMeter: (id: string, payload: MeterUpdate) => Effect.Effect<RemoteMeter, PolarClientError>;
+  readonly archiveMeter: (id: string) => Effect.Effect<RemoteMeter, PolarClientError>;
 };
 
-const fromPromise = <A>(try_: () => Promise<A>): Effect.Effect<A> =>
-  Effect.tryPromise({ try: try_, catch: (cause) => cause }).pipe(Effect.orDie);
+export class PolarClientError extends Schema.TaggedErrorClass<PolarClientError>()(
+  "PolarClientError",
+  {
+    operation: Schema.String,
+    message: Schema.String,
+  },
+) {}
 
-export class PolarClient extends Context.Service<PolarClient, PolarClientShape>()(
-  "@paac/PolarClient",
-) {
+const errorMessage = (cause: unknown): string => {
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === "string") return cause;
+  try {
+    return JSON.stringify(cause);
+  } catch {
+    return String(cause);
+  }
+};
+
+const fromPromise = <A>(
+  operation: string,
+  try_: () => Promise<A>,
+): Effect.Effect<A, PolarClientError> =>
+  Effect.tryPromise({
+    try: try_,
+    catch: (cause) => new PolarClientError({ operation, message: errorMessage(cause) }),
+  });
+
+export class PolarClient extends Context.Service<PolarClient, PolarClientShape>()("@paac/PolarClient") {
   static readonly layer = Layer.effect(
     PolarClient,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const config = yield* AppConfig;
       const sdk = new Polar({
         accessToken: Redacted.value(config.polarAccessToken),
-        server: "sandbox",
+        server: config.polarEnv,
       });
 
       const listProducts = Effect.fn("PolarClient.listProducts")(() =>
-        fromPromise(async () => {
+        fromPromise("products.list", async () => {
           const iterator = await sdk.products.list({ limit: 100 });
           const products: Array<RemoteProduct> = [];
           for await (const page of iterator) {
@@ -49,24 +72,31 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
         }),
       );
 
-      const createProduct = Effect.fn("PolarClient.createProduct")(
-        (payload: ProductCreatePayload) =>
-          fromPromise(() => sdk.products.create(payload as ProductCreate)).pipe(Effect.asVoid),
+      const createProduct = Effect.fn("PolarClient.createProduct")((payload: ProductCreate) =>
+        fromPromise("products.create", () => sdk.products.create(payload)),
       );
 
       const updateProduct = Effect.fn("PolarClient.updateProduct")(
-        (id: string, payload: ProductUpdatePayload) =>
-          fromPromise(() =>
-            sdk.products.update({ id, productUpdate: payload as ProductUpdate }),
-          ).pipe(Effect.asVoid),
+        (id: string, payload: ProductUpdate) =>
+          fromPromise("products.update", () => sdk.products.update({ id, productUpdate: payload })),
       );
 
       const archiveProduct = Effect.fn("PolarClient.archiveProduct")((id: string) =>
         updateProduct(id, { isArchived: true }),
       );
 
+      const updateProductBenefits = Effect.fn("PolarClient.updateProductBenefits")(
+        (id: string, benefitIds: ReadonlyArray<string>) =>
+          fromPromise("products.updateBenefits", () =>
+            sdk.products.updateBenefits({
+              id,
+              productBenefitsUpdate: { benefits: [...benefitIds] } satisfies ProductBenefitsUpdate,
+            }),
+          ),
+      );
+
       const listMeters = Effect.fn("PolarClient.listMeters")(() =>
-        fromPromise(async () => {
+        fromPromise("meters.list", async () => {
           const iterator = await sdk.meters.list({ limit: 100 });
           const meters: Array<RemoteMeter> = [];
           for await (const page of iterator) {
@@ -76,15 +106,12 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
         }),
       );
 
-      const createMeter = Effect.fn("PolarClient.createMeter")((payload: MeterCreatePayload) =>
-        fromPromise(() => sdk.meters.create(payload as MeterCreate)).pipe(Effect.asVoid),
+      const createMeter = Effect.fn("PolarClient.createMeter")((payload: MeterCreate) =>
+        fromPromise("meters.create", () => sdk.meters.create(payload)),
       );
 
-      const updateMeter = Effect.fn("PolarClient.updateMeter")(
-        (id: string, payload: MeterUpdatePayload) =>
-          fromPromise(() => sdk.meters.update({ id, meterUpdate: payload as MeterUpdate })).pipe(
-            Effect.asVoid,
-          ),
+      const updateMeter = Effect.fn("PolarClient.updateMeter")((id: string, payload: MeterUpdate) =>
+        fromPromise("meters.update", () => sdk.meters.update({ id, meterUpdate: payload })),
       );
 
       const archiveMeter = Effect.fn("PolarClient.archiveMeter")((id: string) =>
@@ -96,6 +123,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
         createProduct,
         updateProduct,
         archiveProduct,
+        updateProductBenefits,
         listMeters,
         createMeter,
         updateMeter,

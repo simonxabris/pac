@@ -1,0 +1,365 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { Product, fixedPrice, freePrice, customPrice, meteredUnitPrice, productSpec } from "./product.js";
+import { Meter } from "./meter.js";
+import { resetRegistry } from "./registry.js";
+
+describe("Product", () => {
+  beforeEach(() => {
+    resetRegistry();
+  });
+
+  describe("fixed price product", () => {
+    it("creates a product with a fixed price", () => {
+      const product = new Product("premium", {
+        name: "Premium Plan",
+        prices: [fixedPrice({ amount: "2000", currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource).toEqual({
+        source: "desired",
+        kind: "product",
+        key: "premium",
+        address: "product.premium",
+        spec: {
+          name: "Premium Plan",
+          description: null,
+          prices: [{ type: "fixed", amount: "2000", currency: "usd" }],
+          visibility: "public",
+          recurringInterval: null,
+          recurringIntervalCount: null,
+        },
+      });
+    });
+
+    it("stringifies a numeric fixed price amount", () => {
+      const product = new Product("numeric", {
+        name: "Numeric Amount Plan",
+        prices: [fixedPrice({ amount: 1500, currency: "USD" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0]).toEqual({
+        type: "fixed",
+        amount: "1500",
+        currency: "usd",
+      });
+    });
+  });
+
+  describe("free price product", () => {
+    it("creates a product with a free price", () => {
+      const product = new Product("free-tier", {
+        name: "Free Tier",
+        prices: [freePrice({ currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource).toEqual({
+        source: "desired",
+        kind: "product",
+        key: "free-tier",
+        address: "product.free-tier",
+        spec: {
+          name: "Free Tier",
+          description: null,
+          prices: [{ type: "free", currency: "usd" }],
+          visibility: "public",
+          recurringInterval: null,
+          recurringIntervalCount: null,
+        },
+      });
+    });
+  });
+
+  describe("custom price product", () => {
+    it("creates a product with a custom price including all optional amounts", () => {
+      const product = new Product("pay-what-you-want", {
+        name: "Pay What You Want",
+        prices: [
+          customPrice({
+            currency: "EUR",
+            minimumAmount: "500",
+            maximumAmount: "5000",
+            presetAmount: "2000",
+          }),
+        ],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0]).toEqual({
+        type: "custom",
+        currency: "eur",
+        minimumAmount: "500",
+        maximumAmount: "5000",
+        presetAmount: "2000",
+      });
+    });
+
+    it("creates a custom price with no optional amounts (all null)", () => {
+      const product = new Product("donation", {
+        name: "Donation",
+        prices: [customPrice({ currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0]).toEqual({
+        type: "custom",
+        currency: "usd",
+        minimumAmount: null,
+        maximumAmount: null,
+        presetAmount: null,
+      });
+    });
+
+    it("normalizes numeric optional amounts to strings and null to null", () => {
+      const product = new Product("donation-num", {
+        name: "Donation Numeric",
+        prices: [
+          customPrice({
+            currency: "usd",
+            minimumAmount: 100,
+            maximumAmount: null,
+            presetAmount: 500,
+          }),
+        ],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0]).toEqual({
+        type: "custom",
+        currency: "usd",
+        minimumAmount: "100",
+        maximumAmount: null,
+        presetAmount: "500",
+      });
+    });
+  });
+
+  describe("metered unit price product", () => {
+    it("creates a product with a metered unit price referencing a meter by address string", () => {
+      const meter = new Meter("api-calls", {
+        name: "API Calls",
+        filter: { conjunction: "and", clauses: [{ property: "name", operator: "eq", value: "api_call" }] },
+        aggregation: { func: "count" },
+      });
+
+      const product = new Product("api-product", {
+        name: "API Product",
+        prices: [meteredUnitPrice({ meter: meter.address, amount: "0.01", currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0]).toEqual({
+        type: "meteredUnit",
+        meter: "meter.api-calls",
+        amount: "0.01",
+        currency: "usd",
+        capAmount: null,
+      });
+    });
+
+    it("creates a metered unit price with capAmount", () => {
+      const product = new Product("capped-api", {
+        name: "Capped API",
+        prices: [meteredUnitPrice({ meter: "meter.requests", amount: 0.05, currency: "usd", capAmount: "100" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0]).toEqual({
+        type: "meteredUnit",
+        meter: "meter.requests",
+        amount: "0.05",
+        currency: "usd",
+        capAmount: "100",
+      });
+    });
+
+    it("sets capAmount to null when omitted", () => {
+      const product = new Product("uncapped-api", {
+        name: "Uncapped API",
+        prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.05", currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.prices[0].capAmount).toBeNull();
+    });
+  });
+
+  describe("mixed prices product", () => {
+    it("creates a product with all four price types preserving order", () => {
+      const product = new Product("all-prices", {
+        name: "All Prices",
+        prices: [
+          fixedPrice({ amount: "2000", currency: "usd" }),
+          freePrice({ currency: "usd" }),
+          customPrice({ currency: "usd", minimumAmount: "100", maximumAmount: "5000" }),
+          meteredUnitPrice({ meter: "meter.api-calls", amount: "0.10", currency: "usd", capAmount: "50" }),
+        ],
+      });
+
+      const resource = product.toDesiredResource();
+
+      const prices = resource.spec.prices;
+      expect(prices).toHaveLength(4);
+      expect(prices[0]).toEqual({ type: "fixed", amount: "2000", currency: "usd" });
+      expect(prices[1]).toEqual({ type: "free", currency: "usd" });
+      expect(prices[2]).toEqual({
+        type: "custom",
+        currency: "usd",
+        minimumAmount: "100",
+        maximumAmount: "5000",
+        presetAmount: null,
+      });
+      expect(prices[3]).toEqual({
+        type: "meteredUnit",
+        meter: "meter.api-calls",
+        amount: "0.10",
+        currency: "usd",
+        capAmount: "50",
+      });
+    });
+  });
+
+  describe("defaults and overrides", () => {
+    it("defaults visibility to public", () => {
+      const product = new Product("default-vis", {
+        name: "Default Visibility",
+        prices: [fixedPrice({ amount: "1000", currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.visibility).toBe("public");
+    });
+
+    it("allows visibility to be set to draft", () => {
+      const product = new Product("draft-product", {
+        name: "Draft Product",
+        prices: [fixedPrice({ amount: "1000", currency: "usd" })],
+        visibility: "draft",
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.visibility).toBe("draft");
+    });
+
+    it("allows visibility to be set to private", () => {
+      const product = new Product("private-product", {
+        name: "Private Product",
+        prices: [fixedPrice({ amount: "1000", currency: "usd" })],
+        visibility: "private",
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.visibility).toBe("private");
+    });
+
+    it("defaults description to null", () => {
+      const product = new Product("no-desc", {
+        name: "No Description",
+        prices: [freePrice({ currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.description).toBeNull();
+    });
+
+    it("preserves description when provided", () => {
+      const product = new Product("with-desc", {
+        name: "With Description",
+        description: "A great product",
+        prices: [freePrice({ currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.description).toBe("A great product");
+    });
+
+    it("defaults recurringInterval and recurringIntervalCount to null", () => {
+      const product = new Product("one-time", {
+        name: "One Time",
+        prices: [fixedPrice({ amount: "5000", currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.recurringInterval).toBeNull();
+      expect(resource.spec.recurringIntervalCount).toBeNull();
+    });
+
+    it("sets recurringInterval and recurringIntervalCount when provided", () => {
+      const product = new Product("monthly", {
+        name: "Monthly Plan",
+        prices: [fixedPrice({ amount: "2000", currency: "usd" })],
+        recurringInterval: "month",
+        recurringIntervalCount: 3,
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.recurringInterval).toBe("month");
+      expect(resource.spec.recurringIntervalCount).toBe(3);
+    });
+
+    it("defaults recurringIntervalCount to 1 when recurringInterval is set without count", () => {
+      const product = new Product("monthly-default-count", {
+        name: "Monthly Default Count",
+        prices: [fixedPrice({ amount: "2000", currency: "usd" })],
+        recurringInterval: "month",
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.spec.recurringIntervalCount).toBe(1);
+    });
+  });
+
+  describe("resource envelope shape", () => {
+    it("always has source=desired and kind=product", () => {
+      const product = new Product("envelope-test", {
+        name: "Envelope Test",
+        prices: [freePrice({ currency: "usd" })],
+      });
+
+      const resource = product.toDesiredResource();
+
+      expect(resource.source).toBe("desired");
+      expect(resource.kind).toBe("product");
+      expect(resource.key).toBe("envelope-test");
+      expect(resource.address).toBe("product.envelope-test");
+    });
+  });
+
+  describe("productSpec", () => {
+    it("can be called directly to produce a spec", () => {
+      const spec = productSpec({
+        name: "Direct Spec",
+        description: null,
+        prices: [fixedPrice({ amount: "999", currency: "USD" })],
+      });
+
+      expect(spec).toEqual({
+        name: "Direct Spec",
+        description: null,
+        prices: [{ type: "fixed", amount: "999", currency: "usd" }],
+        visibility: "public",
+        recurringInterval: null,
+        recurringIntervalCount: null,
+      });
+    });
+  });
+});

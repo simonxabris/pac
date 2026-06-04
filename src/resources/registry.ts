@@ -1,11 +1,12 @@
+import type { ResourceAddress } from "../core/address.js";
 import type { DesiredResource } from "../core/resource.js";
 
-export type Resource = {
-  readonly type: string;
-  readonly kind: string;
+export type Resource<Kind extends string = string, Spec = unknown> = {
+  readonly type: Kind;
+  readonly kind: Kind;
   readonly key: string;
-  readonly address: string;
-  readonly toDesiredResource: () => DesiredResource;
+  readonly address: ResourceAddress<Kind>;
+  readonly toDesiredResource: () => DesiredResource<Kind, Spec>;
 };
 
 const registryKey = Symbol.for("paac.resources");
