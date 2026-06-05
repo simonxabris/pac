@@ -119,20 +119,53 @@ const dependsOn = (from: ResourceAddress, to: ResourceAddress): PlanEdge => ({
   to,
 });
 
+const desiredResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArray<DesiredResource> =>
+  nodes.flatMap((node) => {
+    switch (node._tag) {
+      case "Create":
+      case "Update":
+      case "Noop":
+        return [node.desired];
+      case "Blocked":
+        return node.desired === undefined ? [] : [node.desired];
+      case "Archive":
+        return [];
+    }
+  });
+
+const currentResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArray<CurrentResource> =>
+  nodes.flatMap((node) => {
+    switch (node._tag) {
+      case "Update":
+      case "Archive":
+      case "Noop":
+        return [node.current];
+      case "Blocked":
+        return node.current === undefined ? [] : [node.current];
+      case "Create":
+        return [];
+    }
+  });
+
 const buildPlan = (input: {
   nodes: ReadonlyArray<PlanNode>;
   edges?: ReadonlyArray<PlanEdge>;
   diagnostics?: ReadonlyArray<Diagnostic>;
-}): Plan => ({
-  _tag: "PlanGraph",
-  nodes: new Map(input.nodes.map((n) => [n.address, n] as const)),
-  edges: input.edges ?? [],
-  diagnostics: input.diagnostics ?? [],
-  desiredResources: [],
-  desiredResourcesByAddress: new Map(),
-  currentResources: [],
-  currentResourcesByAddress: new Map(),
-});
+}): Plan => {
+  const desiredResources = desiredResourcesFromNodes(input.nodes);
+  const currentResources = currentResourcesFromNodes(input.nodes);
+
+  return {
+    _tag: "PlanGraph",
+    nodes: new Map(input.nodes.map((n) => [n.address, n] as const)),
+    edges: input.edges ?? [],
+    diagnostics: input.diagnostics ?? [],
+    desiredResources,
+    desiredResourcesByAddress: new Map(desiredResources.map((resource) => [resource.address, resource])),
+    currentResources,
+    currentResourcesByAddress: new Map(currentResources.map((resource) => [resource.address, resource])),
+  };
+};
 
 // --- Minimal spec fixtures ---
 
@@ -183,7 +216,8 @@ describe("OperationPlanner.create", () => {
       });
 
       const operationPlanner = yield* OperationPlanner;
-      const operations = yield* operationPlanner.create(plan);
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
 
       expect(operationSummary(operations)).toEqual([
         { address: "meter.requests", kind: "meter", action: "CreateMeter" },
@@ -203,7 +237,8 @@ describe("OperationPlanner.create", () => {
       });
 
       const operationPlanner = yield* OperationPlanner;
-      const operations = yield* operationPlanner.create(plan);
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
 
       expect(operationSummary(operations)).toEqual([
         { address: "product.pro", kind: "product", action: "ArchiveProduct" },
@@ -229,11 +264,69 @@ describe("OperationPlanner.create", () => {
       });
 
       const operationPlanner = yield* OperationPlanner;
-      const operations = yield* operationPlanner.create(plan);
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
 
       expect(operationSummary(operations)).toEqual([
         { address: "product.pro", kind: "product", action: "UpdateProduct" },
       ]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("preserves existing product prices by id when adding a new price", () =>
+    Effect.gen(function*() {
+      const currentSpec: ProductSpec = {
+        ...simpleProductSpec,
+        prices: [{ type: "fixed", amount: "1000", currency: "usd" }],
+      };
+      const desiredSpec: ProductSpec = {
+        ...simpleProductSpec,
+        prices: [
+          { type: "fixed", amount: "1000", currency: "usd" },
+          { type: "free", currency: "usd" },
+        ],
+      };
+      const desired = makeDesiredResource("product", "pro", desiredSpec);
+      const current = {
+        ...makeCurrentResource("product", "pro", "polar-product-pro", currentSpec),
+        providerState: {
+          prices: [
+            {
+              polarPriceId: "price_existing_fixed",
+              spec: currentSpec.prices[0],
+            },
+          ],
+        },
+      };
+
+      const plan = buildPlan({
+        nodes: [
+          updateNode(desired, current, [
+            {
+              _tag: "FieldChange",
+              path: ["prices"],
+              before: currentSpec.prices,
+              after: desiredSpec.prices,
+            },
+          ]),
+        ],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
+      const operation = operations[0];
+
+      expect(operation?.action).toEqual({
+        _tag: "UpdateProduct",
+        id: "polar-product-pro",
+        payload: {
+          prices: [
+            { id: "price_existing_fixed" },
+            { amountType: "free", priceCurrency: "usd" },
+          ],
+        },
+      });
     }).pipe(Effect.provide(testLayer)),
   );
 
@@ -259,7 +352,7 @@ describe("OperationPlanner.create", () => {
       const result = yield* operationPlanner.create(plan).pipe(
         Effect.match({
           onFailure: (error) => ({ _tag: "Failure" as const, error }),
-          onSuccess: (operations) => ({ _tag: "Success" as const, operations }),
+          onSuccess: (program) => ({ _tag: "Success" as const, program }),
         }),
       );
 
@@ -284,9 +377,38 @@ describe("OperationPlanner.create", () => {
       });
 
       const operationPlanner = yield* OperationPlanner;
-      const operations = yield* operationPlanner.create(plan);
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
 
       expect(operations).toEqual([]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("creates initial bindings from current resources", () =>
+    Effect.gen(function*() {
+      const meterDesired = makeDesiredResource("meter", "requests", simpleMeterSpec);
+      const meterCurrent = makeCurrentResource(
+        "meter",
+        "requests",
+        "polar-meter-requests",
+        simpleMeterSpec,
+      );
+      const productDesired = makeDesiredResource("product", "pro", simpleProductSpec);
+
+      const plan = buildPlan({
+        nodes: [noopNode(meterDesired, meterCurrent), createNode(productDesired)],
+        edges: [dependsOn("product.pro", "meter.requests")],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const program = yield* operationPlanner.create(plan);
+
+      expect([...program.initialBindings.entries()]).toEqual([
+        ["meter.requests", { polarId: "polar-meter-requests" }],
+      ]);
+      expect(operationSummary(program.operations)).toEqual([
+        { address: "product.pro", kind: "product", action: "CreateProduct" },
+      ]);
     }).pipe(Effect.provide(testLayer)),
   );
 
@@ -304,7 +426,8 @@ describe("OperationPlanner.create", () => {
       });
 
       const operationPlanner = yield* OperationPlanner;
-      const operations = yield* operationPlanner.create(plan);
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
 
       const productIndex = operations.findIndex((o) => o.address === "product.pro");
       const meterIndex = operations.findIndex((o) => o.address === "meter.requests");
@@ -326,7 +449,7 @@ describe("OperationPlanner.create", () => {
       const result = yield* operationPlanner.create(plan).pipe(
         Effect.match({
           onFailure: (error) => ({ _tag: "Failure" as const, error }),
-          onSuccess: (operations) => ({ _tag: "Success" as const, operations }),
+          onSuccess: (program) => ({ _tag: "Success" as const, program }),
         }),
       );
 

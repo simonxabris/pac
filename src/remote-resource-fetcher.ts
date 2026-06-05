@@ -37,6 +37,7 @@ const ManagedIdentityEnvelope = Schema.Struct({
 });
 
 const RemoteProductPriceFixed = Schema.Struct({
+  id: Schema.String,
   amountType: Schema.Literal("fixed"),
   priceAmount: Schema.Number,
   priceCurrency: Schema.String,
@@ -44,12 +45,14 @@ const RemoteProductPriceFixed = Schema.Struct({
 });
 
 const RemoteProductPriceFree = Schema.Struct({
+  id: Schema.String,
   amountType: Schema.Literal("free"),
   priceCurrency: Schema.String,
   isArchived: Schema.Boolean,
 });
 
 const RemoteProductPriceCustom = Schema.Struct({
+  id: Schema.String,
   amountType: Schema.Literal("custom"),
   priceCurrency: Schema.String,
   isArchived: Schema.Boolean,
@@ -59,6 +62,7 @@ const RemoteProductPriceCustom = Schema.Struct({
 });
 
 const RemoteProductPriceMeteredUnit = Schema.Struct({
+  id: Schema.String,
   amountType: Schema.Literal("metered_unit"),
   priceCurrency: Schema.String,
   isArchived: Schema.Boolean,
@@ -206,6 +210,9 @@ const productToCurrentResource = ({
   meterAddressesById,
 }: typeof RemoteProductResourceInput.Type): CurrentProductResource => {
   const identity = identityForKind("product", product.metadata);
+  const activePrices = product.prices.filter((price) => !price.isArchived);
+  const prices = activePrices.map((price) => productPriceToSpec(price, meterAddressesById));
+
   return {
     source: "current",
     kind: "product",
@@ -215,13 +222,17 @@ const productToCurrentResource = ({
     spec: {
       name: product.name,
       description: product.description,
-      prices: product.prices
-        .filter((price) => !price.isArchived)
-        .map((price) => productPriceToSpec(price, meterAddressesById)),
+      prices,
       visibility: product.visibility,
       recurringInterval: product.recurringInterval,
       recurringIntervalCount:
         product.recurringInterval === null ? null : (product.recurringIntervalCount ?? 1),
+    },
+    providerState: {
+      prices: activePrices.map((price, index) => ({
+        polarPriceId: price.id,
+        spec: prices[index] as ProductPriceSpec,
+      })),
     },
     raw: product,
   };
@@ -238,19 +249,26 @@ const productResourceToRemoteInput = (
     recurringInterval: resource.spec.recurringInterval,
     recurringIntervalCount: resource.spec.recurringIntervalCount,
     metadata: {},
-    prices: resource.spec.prices.map((price) => {
+    prices: resource.spec.prices.map((price, index) => {
+      const providerPrice = resource.providerState.prices[index];
+      if (providerPrice === undefined) {
+        throw new Error(`Missing provider state for product price at index ${index}.`);
+      }
+      const id = providerPrice.polarPriceId;
       switch (price.type) {
         case "fixed":
           return {
+            id,
             amountType: "fixed",
             priceAmount: Number(price.amount),
             priceCurrency: price.currency,
             isArchived: false,
           };
         case "free":
-          return { amountType: "free", priceCurrency: price.currency, isArchived: false };
+          return { id, amountType: "free", priceCurrency: price.currency, isArchived: false };
         case "custom":
           return {
+            id,
             amountType: "custom",
             priceCurrency: price.currency,
             isArchived: false,
@@ -260,6 +278,7 @@ const productResourceToRemoteInput = (
           };
         case "meteredUnit":
           return {
+            id,
             amountType: "metered_unit",
             priceCurrency: price.currency,
             isArchived: false,

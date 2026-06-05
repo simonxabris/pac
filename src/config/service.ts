@@ -1,9 +1,14 @@
-import { Config, Effect, Layer, Redacted, Schema } from "effect";
+import { Schema } from "effect";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 
 export type AppConfigShape = {
   readonly polarAccessToken: Redacted.Redacted<string>;
   readonly polarEnv: "production" | "sandbox";
+  readonly polarServerUrl: string;
 };
 
 const config = {
@@ -12,6 +17,7 @@ const config = {
     Schema.Union([Schema.Literal("production"), Schema.Literal("sandbox")]),
     "POLAR_ENV",
   ),
+  polarServerUrl: Config.schema(Schema.String, "POLAR_SERVER_URL"),
 };
 
 export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()("@paac/AppConfig") {
@@ -28,6 +34,7 @@ export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()("@pa
     AppConfig.of({
       polarAccessToken: Redacted.make("test-polar-access-token"),
       polarEnv: "sandbox",
+      polarServerUrl: "asd",
     }),
   );
 }

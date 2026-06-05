@@ -21,11 +21,12 @@ export type DesiredResource<Kind extends ResourceKind = ResourceKind, Spec = unk
   Spec
 >;
 
-export type CurrentResource<Kind extends ResourceKind = ResourceKind, Spec = unknown> = ResourceEnvelope<
-  "current",
-  Kind,
-  Spec
-> & {
+export type CurrentResource<
+  Kind extends ResourceKind = ResourceKind,
+  Spec = unknown,
+  ProviderState = unknown,
+> = ResourceEnvelope<"current", Kind, Spec> & {
   readonly polarId: string;
+  readonly providerState?: ProviderState;
   readonly raw?: unknown;
 };

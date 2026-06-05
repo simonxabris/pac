@@ -12,6 +12,7 @@ import {
   type CurrentProductResource,
 } from "./resources/product.js";
 import { ProductResourceAdapter } from "./resources/product-adapter.js";
+import { currentProductResource } from "./resources/product-test-helper.js";
 import { resetRegistry } from "./resources/registry.js";
 
 const testLayer = Planner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive));
@@ -87,17 +88,14 @@ describe("Planner.plan", () => {
         name: "Pro",
         prices: [fixedPrice({ amount: "2000", currency: "usd" })],
       }).toDesiredResource();
-      const current: CurrentProductResource = {
-        source: "current",
-        kind: "product",
-        key: desired.key,
-        address: desired.address,
+      const current: CurrentProductResource = currentProductResource({
+        desired,
         polarId: "polar-product-pro",
         spec: {
           ...desired.spec,
           name: "Old Pro",
         },
-      };
+      });
       const planner = yield* Planner;
 
       const plan = yield* planner.plan({
@@ -331,14 +329,10 @@ describe("Planner.plan", () => {
         name: "Pro",
         prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.01", currency: "usd" })],
       }).toDesiredResource();
-      const currentProduct: CurrentProductResource = {
-        source: "current",
-        kind: "product",
-        key: product.key,
-        address: product.address,
+      const currentProduct: CurrentProductResource = currentProductResource({
+        desired: product,
         polarId: "polar-product-pro",
-        spec: product.spec,
-      };
+      });
       const planner = yield* Planner;
 
       const plan = yield* planner.plan({
@@ -376,14 +370,10 @@ describe("Planner.plan", () => {
         name: "Legacy",
         prices: [fixedPrice({ amount: "1000", currency: "usd" })],
       }).toDesiredResource();
-      const current: CurrentProductResource = {
-        source: "current",
-        kind: "product",
-        key: desiredShape.key,
-        address: desiredShape.address,
+      const current: CurrentProductResource = currentProductResource({
+        desired: desiredShape,
         polarId: "polar-product-legacy",
-        spec: desiredShape.spec,
-      };
+      });
       const planner = yield* Planner;
 
       const plan = yield* planner.plan({
@@ -425,14 +415,10 @@ describe("Planner.plan", () => {
         polarId: "polar-meter-requests",
         spec: meter.spec,
       };
-      const currentProduct: CurrentProductResource = {
-        source: "current",
-        kind: "product",
-        key: product.key,
-        address: product.address,
+      const currentProduct: CurrentProductResource = currentProductResource({
+        desired: product,
         polarId: "polar-product-pro",
-        spec: product.spec,
-      };
+      });
       const planner = yield* Planner;
 
       const plan = yield* planner.plan({

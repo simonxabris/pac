@@ -10,19 +10,13 @@ import {
   type CurrentProductResource,
   type ProductResource,
 } from "./product.js";
+import { currentProductResource } from "./product-test-helper.js";
 import { resetRegistry } from "./registry.js";
 
 const currentFromDesired = (
   desired: ProductResource,
   spec: CurrentProductResource["spec"] = desired.spec,
-): CurrentProductResource => ({
-  source: "current",
-  kind: "product",
-  key: desired.key,
-  address: desired.address,
-  polarId: `polar-${desired.key}`,
-  spec,
-});
+): CurrentProductResource => currentProductResource({ desired, spec });
 
 describe("ProductResourceAdapter.createOperationsFromPlan", () => {
   beforeEach(() => {
@@ -193,13 +187,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                 name: "Old Pro",
                 description: "Old description",
                 visibility: "private",
-                prices: [
-                  {
-                    amountType: "fixed",
-                    priceCurrency: "usd",
-                    priceAmount: 2000,
-                  },
-                ],
+                prices: [{ id: "polar-price-0" }],
               },
             },
           },

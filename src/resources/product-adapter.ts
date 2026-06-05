@@ -5,6 +5,7 @@ import type {
   ProductCreateOperationPayload,
   ProductPriceCreatePayload,
   ProductUpdateOperationPayload,
+  ProductUpdatePricePayload,
 } from "../operations/payloads/product.js";
 import type { OperationRef } from "../operations/ref.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
@@ -13,7 +14,12 @@ import type {
   ResourceAdapter,
   ResourceExecutablePlanNode,
 } from "../resource-adapter-registry.js";
-import type { ProductKind, ProductPriceSpec, ProductSpec } from "./product.js";
+import type {
+  CurrentProductProviderState,
+  ProductKind,
+  ProductPriceSpec,
+  ProductSpec,
+} from "./product.js";
 
 const valuesEqual = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
@@ -193,9 +199,23 @@ const hasChanged = (
   field: keyof ProductSpec,
 ): boolean => changes.some((change) => change.path[0] === field);
 
+const productPriceUpdatePayloads = (
+  prices: ReadonlyArray<ProductPriceSpec>,
+  providerState: CurrentProductProviderState,
+): ReadonlyArray<ProductUpdatePricePayload> =>
+  prices.map((price, index) => {
+    const currentPrice = providerState.prices[index];
+    if (currentPrice !== undefined && valuesEqual(currentPrice.spec, price)) {
+      return { id: currentPrice.polarPriceId };
+    }
+
+    return productPriceCreatePayload(price);
+  });
+
 const productUpdatePayload = (
   spec: ProductSpec,
   changes: ReadonlyArray<FieldChange>,
+  providerState: CurrentProductProviderState,
 ): ProductUpdateOperationPayload => {
   const payload: ProductUpdateOperationPayload = {};
 
@@ -212,7 +232,7 @@ const productUpdatePayload = (
   }
 
   if (hasChanged(changes, "prices")) {
-    payload.prices = spec.prices.map(productPriceCreatePayload);
+    payload.prices = productPriceUpdatePayloads(spec.prices, providerState);
   }
 
   return payload;
@@ -245,10 +265,11 @@ const createProductOperationFromPlanNode = (
         },
       };
     case "Update": {
+      const providerState = node.current.providerState as CurrentProductProviderState;
       const action: OperationAction = {
         _tag: "UpdateProduct",
         id: node.current.polarId,
-        payload: productUpdatePayload(node.desired.spec, node.changes),
+        payload: productUpdatePayload(node.desired.spec, node.changes, providerState),
       };
 
       return {
@@ -262,7 +283,7 @@ const createProductOperationFromPlanNode = (
           action: {
             _tag: "UpdateProduct",
             id: node.current.polarId,
-            payload: productUpdatePayload(node.current.spec, node.changes),
+            payload: productUpdatePayload(node.current.spec, node.changes, providerState),
           },
         },
       };

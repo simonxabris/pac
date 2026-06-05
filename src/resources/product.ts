@@ -95,8 +95,20 @@ export type ProductSpec = {
   readonly recurringIntervalCount: number | null;
 };
 
+export type CurrentProductProviderState = {
+  readonly prices: ReadonlyArray<{
+    readonly polarPriceId: string;
+    readonly spec: ProductPriceSpec;
+  }>;
+};
+
 export type ProductResource = DesiredResource<ProductKind, ProductSpec>;
-export type CurrentProductResource = CurrentResource<ProductKind, ProductSpec>;
+export type CurrentProductResource = Omit<
+  CurrentResource<ProductKind, ProductSpec, CurrentProductProviderState>,
+  "providerState"
+> & {
+  readonly providerState: CurrentProductProviderState;
+};
 
 export const ProductFixedPriceSpecSchema = Schema.Struct({
   type: Schema.Literal("fixed"),
@@ -151,6 +163,15 @@ export const ProductResourceSchema = Schema.Struct({
   spec: ProductSpecSchema,
 });
 
+export const CurrentProductProviderStateSchema = Schema.Struct({
+  prices: Schema.Array(
+    Schema.Struct({
+      polarPriceId: Schema.String,
+      spec: ProductPriceSpecSchema,
+    }),
+  ),
+});
+
 export const CurrentProductResourceSchema = Schema.Struct({
   source: Schema.Literal("current"),
   kind: Schema.Literal("product"),
@@ -158,6 +179,7 @@ export const CurrentProductResourceSchema = Schema.Struct({
   address: ProductAddressSchema,
   polarId: Schema.String,
   spec: ProductSpecSchema,
+  providerState: CurrentProductProviderStateSchema,
   raw: Schema.optionalKey(Schema.Unknown),
 });
 

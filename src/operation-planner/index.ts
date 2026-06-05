@@ -4,4 +4,5 @@ export type {
   OperationConstraint,
   OperationGroup,
   OperationId,
+  OperationProgram,
 } from "./types.js";

@@ -9,6 +9,7 @@ import type {
   OperationConstraint,
   OperationGroup,
   OperationId,
+  OperationProgram,
 } from "./operation-planner/types.js";
 import {
   MissingResourceAdapter,
@@ -199,6 +200,16 @@ const topologicalSortOperations = (
   return sorted.length === operations.length ? sorted : undefined;
 };
 
+const createInitialBindings = (plan: Plan): OperationProgram["initialBindings"] => {
+  const bindings = new Map<ResourceAddress, { readonly polarId: string }>();
+
+  for (const resource of plan.currentResources) {
+    bindings.set(resource.address, { polarId: resource.polarId });
+  }
+
+  return bindings;
+};
+
 const assertPlanExecutable = (plan: Plan): Effect.Effect<void, PlanNotExecutable> => {
   const blockedAddresses = [...plan.nodes.values()]
     .filter((node) => node._tag === "Blocked")
@@ -226,7 +237,7 @@ export class OperationPlanner extends Context.Service<
     readonly create: (
       plan: Plan,
     ) => Effect.Effect<
-      ReadonlyArray<Operation>,
+      OperationProgram,
       PlanNotExecutable | MissingResourceAdapter | ResourceAdapterPlanError
     >;
   }
@@ -257,7 +268,10 @@ export class OperationPlanner extends Context.Service<
               });
             }
 
-            return sorted;
+            return {
+              operations: sorted,
+              initialBindings: createInitialBindings(plan),
+            };
           }),
       });
     }),

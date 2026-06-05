@@ -1,4 +1,9 @@
 import type {
+  MeterArchiveOperationPayload,
+  MeterCreateOperationPayload,
+  MeterUpdateOperationPayload,
+} from "./payloads/meter.js";
+import type {
   ProductArchiveOperationPayload,
   ProductCreateOperationPayload,
   ProductUpdateOperationPayload,
@@ -7,18 +12,19 @@ import type { Resolvable } from "./ref.js";
 
 export type CreateMeterAction = {
   readonly _tag: "CreateMeter";
-  readonly payload: unknown;
+  readonly payload: MeterCreateOperationPayload;
 };
 
 export type UpdateMeterAction = {
   readonly _tag: "UpdateMeter";
   readonly id: Resolvable<string>;
-  readonly payload: unknown;
+  readonly payload: MeterUpdateOperationPayload;
 };
 
 export type ArchiveMeterAction = {
   readonly _tag: "ArchiveMeter";
   readonly id: Resolvable<string>;
+  readonly payload: MeterArchiveOperationPayload;
 };
 
 export type CreateProductAction = {

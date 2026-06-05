@@ -1,5 +1,6 @@
 import type { ResourceAddress } from "../core/address.js";
 import type { ArchivePlanNode, CreatePlanNode, UpdatePlanNode } from "../planner.js";
+import type { ResourceBindings } from "../operations/bindings.js";
 import type { Operation } from "../operations/operation.js";
 
 export type OperationId = string;
@@ -24,4 +25,9 @@ export type LoweredPlanNodes = {
   readonly groups: ReadonlyArray<OperationGroup>;
   readonly groupsByAddress: ReadonlyMap<ResourceAddress, OperationGroup>;
   readonly operations: ReadonlyArray<Operation>;
+};
+
+export type OperationProgram = {
+  readonly operations: ReadonlyArray<Operation>;
+  readonly initialBindings: ResourceBindings;
 };

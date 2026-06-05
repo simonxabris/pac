@@ -7,7 +7,13 @@ export type {
   UpdateMeterAction,
   UpdateProductAction,
 } from "./actions.js";
+export type { ResourceBinding, ResourceBindings } from "./bindings.js";
 export type { Operation, RollbackAction } from "./operation.js";
+export type {
+  MeterArchiveOperationPayload,
+  MeterCreateOperationPayload,
+  MeterUpdateOperationPayload,
+} from "./payloads/meter.js";
 export type {
   ProductArchiveOperationPayload,
   ProductCreateOperationPayload,
