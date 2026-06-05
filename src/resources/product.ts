@@ -4,7 +4,7 @@ import {
   majorToMinorUnitDecimalAmount,
   normalizeCurrency,
   optionalMajorToMinorUnitAmount,
-} from "../billing/currency.js";
+} from "../currency//currency.js";
 import { makeAddress, type ResourceAddress } from "../core/address.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import { MeterAddressSchema, type MeterAddress } from "./meter.js";
@@ -154,9 +154,18 @@ export const ProductSpecSchema = Schema.Struct({
   name: Schema.String,
   description: Schema.NullOr(Schema.String),
   prices: Schema.Array(ProductPriceSpecSchema),
-  visibility: Schema.Union([Schema.Literal("draft"), Schema.Literal("private"), Schema.Literal("public")]),
+  visibility: Schema.Union([
+    Schema.Literal("draft"),
+    Schema.Literal("private"),
+    Schema.Literal("public"),
+  ]),
   recurringInterval: Schema.NullOr(
-    Schema.Union([Schema.Literal("day"), Schema.Literal("week"), Schema.Literal("month"), Schema.Literal("year")]),
+    Schema.Union([
+      Schema.Literal("day"),
+      Schema.Literal("week"),
+      Schema.Literal("month"),
+      Schema.Literal("year"),
+    ]),
   ),
   recurringIntervalCount: Schema.NullOr(Schema.Number),
 });
@@ -277,7 +286,8 @@ export const productSpec = (config: ProductConfig): ProductSpec => {
     prices: config.prices.map(productPriceSpec),
     visibility: config.visibility ?? "public",
     recurringInterval,
-    recurringIntervalCount: recurringInterval === null ? null : config.recurringIntervalCount ?? 1,
+    recurringIntervalCount:
+      recurringInterval === null ? null : (config.recurringIntervalCount ?? 1),
   });
 };
 

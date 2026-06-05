@@ -7,7 +7,7 @@ import {
   polarDecimalMinorUnitAmount,
   polarIntegerMinorUnitAmount,
   polarIntegerMinorUnitNumber,
-} from "./billing/currency.js";
+} from "./currency//currency.js";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
 import type { CurrentResource } from "./core/resource.js";
 import { PolarClient } from "./polar/service.js";

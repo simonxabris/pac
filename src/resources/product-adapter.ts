@@ -3,7 +3,7 @@ import {
   optionalPolarIntegerMinorUnitNumber,
   polarDecimalMinorUnitAmount,
   polarIntegerMinorUnitNumber,
-} from "../billing/currency.js";
+} from "../currency/currency.js";
 import type { OperationAction } from "../operations/actions.js";
 import type { Operation, RollbackAction } from "../operations/operation.js";
 import type {
@@ -198,10 +198,8 @@ const productCreatePayload = (
   };
 };
 
-const hasChanged = (
-  changes: ReadonlyArray<FieldChange>,
-  field: keyof ProductSpec,
-): boolean => changes.some((change) => change.path[0] === field);
+const hasChanged = (changes: ReadonlyArray<FieldChange>, field: keyof ProductSpec): boolean =>
+  changes.some((change) => change.path[0] === field);
 
 const productPriceUpdatePayloads = (
   prices: ReadonlyArray<ProductPriceSpec>,
