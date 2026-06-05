@@ -25,7 +25,7 @@ describe("Product", () => {
         spec: {
           name: "Premium Plan",
           description: null,
-          prices: [{ type: "fixed", amount: "2000", currency: "usd" }],
+          prices: [{ type: "fixed", amount: "200000", currency: "usd" }],
           visibility: "public",
           recurringInterval: null,
           recurringIntervalCount: null,
@@ -33,7 +33,7 @@ describe("Product", () => {
       });
     });
 
-    it("stringifies a numeric fixed price amount", () => {
+    it("normalizes a numeric fixed price amount to minor units", () => {
       const product = new Product("numeric", {
         name: "Numeric Amount Plan",
         prices: [fixedPrice({ amount: 1500, currency: "USD" })],
@@ -43,8 +43,30 @@ describe("Product", () => {
 
       expect(resource.spec.prices[0]).toEqual({
         type: "fixed",
-        amount: "1500",
+        amount: "150000",
         currency: "usd",
+      });
+    });
+
+    it("normalizes user-facing major-unit fixed prices to canonical minor units", () => {
+      const usdProduct = new Product("usd-major", {
+        name: "USD Major Unit Plan",
+        prices: [fixedPrice({ amount: 30, currency: "usd" })],
+      });
+      const jpyProduct = new Product("jpy-major", {
+        name: "JPY Major Unit Plan",
+        prices: [fixedPrice({ amount: 30, currency: "jpy" })],
+      });
+
+      expect(usdProduct.toDesiredResource().spec.prices[0]).toEqual({
+        type: "fixed",
+        amount: "3000",
+        currency: "usd",
+      });
+      expect(jpyProduct.toDesiredResource().spec.prices[0]).toEqual({
+        type: "fixed",
+        amount: "30",
+        currency: "jpy",
       });
     });
   });
@@ -94,9 +116,9 @@ describe("Product", () => {
       expect(resource.spec.prices[0]).toEqual({
         type: "custom",
         currency: "eur",
-        minimumAmount: "500",
-        maximumAmount: "5000",
-        presetAmount: "2000",
+        minimumAmount: "50000",
+        maximumAmount: "500000",
+        presetAmount: "200000",
       });
     });
 
@@ -135,9 +157,31 @@ describe("Product", () => {
       expect(resource.spec.prices[0]).toEqual({
         type: "custom",
         currency: "usd",
-        minimumAmount: "100",
+        minimumAmount: "10000",
         maximumAmount: null,
-        presetAmount: "500",
+        presetAmount: "50000",
+      });
+    });
+
+    it("normalizes user-facing major-unit custom price amounts to canonical minor units", () => {
+      const product = new Product("custom-major", {
+        name: "Custom Major Unit Amounts",
+        prices: [
+          customPrice({
+            currency: "usd",
+            minimumAmount: 5,
+            maximumAmount: 50,
+            presetAmount: 10,
+          }),
+        ],
+      });
+
+      expect(product.toDesiredResource().spec.prices[0]).toEqual({
+        type: "custom",
+        currency: "usd",
+        minimumAmount: "500",
+        maximumAmount: "5000",
+        presetAmount: "1000",
       });
     });
   });
@@ -160,7 +204,7 @@ describe("Product", () => {
       expect(resource.spec.prices[0]).toEqual({
         type: "meteredUnit",
         meter: "meter.api-calls",
-        amount: "0.01",
+        amount: "1",
         currency: "usd",
         capAmount: null,
       });
@@ -177,9 +221,31 @@ describe("Product", () => {
       expect(resource.spec.prices[0]).toEqual({
         type: "meteredUnit",
         meter: "meter.requests",
-        amount: "0.05",
+        amount: "5",
         currency: "usd",
-        capAmount: "100",
+        capAmount: "10000",
+      });
+    });
+
+    it("normalizes user-facing major-unit metered price and cap amounts", () => {
+      const product = new Product("metered-major", {
+        name: "Metered Major Unit Amounts",
+        prices: [
+          meteredUnitPrice({
+            meter: "meter.requests",
+            amount: "0.001",
+            currency: "usd",
+            capAmount: 100,
+          }),
+        ],
+      });
+
+      expect(product.toDesiredResource().spec.prices[0]).toEqual({
+        type: "meteredUnit",
+        meter: "meter.requests",
+        amount: "0.1",
+        currency: "usd",
+        capAmount: "10000",
       });
     });
 
@@ -211,21 +277,21 @@ describe("Product", () => {
 
       const prices = resource.spec.prices;
       expect(prices).toHaveLength(4);
-      expect(prices[0]).toEqual({ type: "fixed", amount: "2000", currency: "usd" });
+      expect(prices[0]).toEqual({ type: "fixed", amount: "200000", currency: "usd" });
       expect(prices[1]).toEqual({ type: "free", currency: "usd" });
       expect(prices[2]).toEqual({
         type: "custom",
         currency: "usd",
-        minimumAmount: "100",
-        maximumAmount: "5000",
+        minimumAmount: "10000",
+        maximumAmount: "500000",
         presetAmount: null,
       });
       expect(prices[3]).toEqual({
         type: "meteredUnit",
         meter: "meter.api-calls",
-        amount: "0.10",
+        amount: "10",
         currency: "usd",
-        capAmount: "50",
+        capAmount: "5000",
       });
     });
   });
@@ -355,7 +421,7 @@ describe("Product", () => {
       expect(spec).toEqual({
         name: "Direct Spec",
         description: null,
-        prices: [{ type: "fixed", amount: "999", currency: "usd" }],
+        prices: [{ type: "fixed", amount: "99900", currency: "usd" }],
         visibility: "public",
         recurringInterval: null,
         recurringIntervalCount: null,

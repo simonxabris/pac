@@ -1,5 +1,13 @@
 import { Effect, Layer, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 import * as Context from "effect/Context";
+import {
+  normalizeCurrency,
+  optionalPolarIntegerMinorUnitAmount,
+  optionalPolarIntegerMinorUnitNumber,
+  polarDecimalMinorUnitAmount,
+  polarIntegerMinorUnitAmount,
+  polarIntegerMinorUnitNumber,
+} from "./billing/currency.js";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
 import type { CurrentResource } from "./core/resource.js";
 import { PolarClient } from "./polar/service.js";
@@ -161,32 +169,31 @@ const identityForKind = (
   return identity;
 };
 
-const currency = (value: string): string => value.toLowerCase();
-const amount = (value: string | number): string => String(value);
-const optionalAmount = (value: number | null): string | null =>
-  value === null ? null : String(value);
-
 const productPriceToSpec = (
   price: RemoteProductPrice,
   meterAddressesById: Readonly<Record<string, ResourceAddress<"meter">>>,
 ): ProductPriceSpec => {
   switch (price.amountType) {
-    case "fixed":
+    case "fixed": {
+      const priceCurrency = normalizeCurrency(price.priceCurrency);
       return {
         type: "fixed",
-        amount: amount(price.priceAmount),
-        currency: currency(price.priceCurrency),
+        amount: polarIntegerMinorUnitAmount(price.priceAmount, priceCurrency),
+        currency: priceCurrency,
       };
+    }
     case "free":
-      return { type: "free", currency: currency(price.priceCurrency) };
-    case "custom":
+      return { type: "free", currency: normalizeCurrency(price.priceCurrency) };
+    case "custom": {
+      const priceCurrency = normalizeCurrency(price.priceCurrency);
       return {
         type: "custom",
-        currency: currency(price.priceCurrency),
-        minimumAmount: amount(price.minimumAmount),
-        maximumAmount: optionalAmount(price.maximumAmount),
-        presetAmount: optionalAmount(price.presetAmount),
+        currency: priceCurrency,
+        minimumAmount: polarIntegerMinorUnitAmount(price.minimumAmount, priceCurrency),
+        maximumAmount: optionalPolarIntegerMinorUnitAmount(price.maximumAmount, priceCurrency),
+        presetAmount: optionalPolarIntegerMinorUnitAmount(price.presetAmount, priceCurrency),
       };
+    }
     case "metered_unit": {
       const meterAddress = meterAddressesById[price.meterId];
       if (meterAddress === undefined) {
@@ -194,12 +201,13 @@ const productPriceToSpec = (
           `Metered product price references unmanaged or unknown meter '${price.meterId}'.`,
         );
       }
+      const priceCurrency = normalizeCurrency(price.priceCurrency);
       return {
         type: "meteredUnit",
         meter: meterAddress,
-        amount: amount(price.unitAmount),
-        currency: currency(price.priceCurrency),
-        capAmount: optionalAmount(price.capAmount),
+        amount: polarDecimalMinorUnitAmount(price.unitAmount, priceCurrency),
+        currency: priceCurrency,
+        capAmount: optionalPolarIntegerMinorUnitAmount(price.capAmount, priceCurrency),
       };
     }
   }
@@ -260,7 +268,7 @@ const productResourceToRemoteInput = (
           return {
             id,
             amountType: "fixed",
-            priceAmount: Number(price.amount),
+            priceAmount: polarIntegerMinorUnitNumber(price.amount, price.currency),
             priceCurrency: price.currency,
             isArchived: false,
           };
@@ -272,9 +280,9 @@ const productResourceToRemoteInput = (
             amountType: "custom",
             priceCurrency: price.currency,
             isArchived: false,
-            minimumAmount: Number(price.minimumAmount ?? 0),
-            maximumAmount: price.maximumAmount === null ? null : Number(price.maximumAmount),
-            presetAmount: price.presetAmount === null ? null : Number(price.presetAmount),
+            minimumAmount: polarIntegerMinorUnitNumber(price.minimumAmount ?? "0", price.currency),
+            maximumAmount: optionalPolarIntegerMinorUnitNumber(price.maximumAmount, price.currency),
+            presetAmount: optionalPolarIntegerMinorUnitNumber(price.presetAmount, price.currency),
           };
         case "meteredUnit":
           return {
@@ -282,8 +290,8 @@ const productResourceToRemoteInput = (
             amountType: "metered_unit",
             priceCurrency: price.currency,
             isArchived: false,
-            unitAmount: price.amount,
-            capAmount: price.capAmount === null ? null : Number(price.capAmount),
+            unitAmount: polarDecimalMinorUnitAmount(price.amount, price.currency),
+            capAmount: optionalPolarIntegerMinorUnitNumber(price.capAmount, price.currency),
             meterId: price.meter,
           };
       }

@@ -1,4 +1,9 @@
 import { Effect } from "effect";
+import {
+  optionalPolarIntegerMinorUnitNumber,
+  polarDecimalMinorUnitAmount,
+  polarIntegerMinorUnitNumber,
+} from "../billing/currency.js";
 import type { OperationAction } from "../operations/actions.js";
 import type { Operation, RollbackAction } from "../operations/operation.js";
 import type {
@@ -131,16 +136,13 @@ const managedMetadata = (kind: ProductKind, address: OperationRef["address"], ke
   }),
 });
 
-const numberAmount = (amount: string | null): number | null =>
-  amount === null ? null : Number(amount);
-
 const productPriceCreatePayload = (price: ProductPriceSpec): ProductPriceCreatePayload => {
   switch (price.type) {
     case "fixed":
       return {
         amountType: "fixed",
         priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
-        priceAmount: Number(price.amount),
+        priceAmount: polarIntegerMinorUnitNumber(price.amount, price.currency),
       };
     case "free":
       return {
@@ -151,9 +153,11 @@ const productPriceCreatePayload = (price: ProductPriceSpec): ProductPriceCreateP
       const payload: ProductPriceCreatePayload = {
         amountType: "custom",
         priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
-        ...(price.minimumAmount === null ? {} : { minimumAmount: Number(price.minimumAmount) }),
-        maximumAmount: numberAmount(price.maximumAmount),
-        presetAmount: numberAmount(price.presetAmount),
+        ...(price.minimumAmount === null
+          ? {}
+          : { minimumAmount: polarIntegerMinorUnitNumber(price.minimumAmount, price.currency) }),
+        maximumAmount: optionalPolarIntegerMinorUnitNumber(price.maximumAmount, price.currency),
+        presetAmount: optionalPolarIntegerMinorUnitNumber(price.presetAmount, price.currency),
       };
       return payload;
     }
@@ -162,8 +166,8 @@ const productPriceCreatePayload = (price: ProductPriceSpec): ProductPriceCreateP
         amountType: "metered_unit",
         priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
         meterId: polarIdRef(price.meter),
-        unitAmount: price.amount,
-        capAmount: numberAmount(price.capAmount),
+        unitAmount: polarDecimalMinorUnitAmount(price.amount, price.currency),
+        capAmount: optionalPolarIntegerMinorUnitNumber(price.capAmount, price.currency),
       };
   }
 };

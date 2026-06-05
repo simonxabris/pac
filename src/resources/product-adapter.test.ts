@@ -73,7 +73,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                 {
                   amountType: "fixed",
                   priceCurrency: "usd",
-                  priceAmount: 3000,
+                  priceAmount: 300000,
                 },
                 {
                   amountType: "free",
@@ -82,9 +82,9 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                 {
                   amountType: "custom",
                   priceCurrency: "usd",
-                  minimumAmount: 500,
+                  minimumAmount: 50000,
                   maximumAmount: null,
-                  presetAmount: 1000,
+                  presetAmount: 100000,
                 },
                 {
                   amountType: "metered_unit",
@@ -94,8 +94,8 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                     address: "meter.requests",
                     field: "polarId",
                   },
-                  unitAmount: "0.01",
-                  capAmount: 100,
+                  unitAmount: "1",
+                  capAmount: 10000,
                 },
               ],
               recurringInterval: "month",
@@ -114,6 +114,49 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
               payload: { isArchived: true },
             },
           },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("creates Polar payloads from user-facing major-unit price config", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [
+          fixedPrice({ amount: 30, currency: "usd" }),
+          meteredUnitPrice({ meter: "meter.requests", amount: "0.001", currency: "usd", capAmount: 100 }),
+        ],
+      }).toDesiredResource();
+
+      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Create",
+          address: desired.address,
+          kind: "product",
+          desired,
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations[0]?.action._tag).toBe("CreateProduct");
+      if (operations[0]?.action._tag !== "CreateProduct") return;
+      expect(operations[0].action.payload.prices).toEqual([
+        {
+          amountType: "fixed",
+          priceCurrency: "usd",
+          priceAmount: 3000,
+        },
+        {
+          amountType: "metered_unit",
+          priceCurrency: "usd",
+          meterId: {
+            _tag: "Ref",
+            address: "meter.requests",
+            field: "polarId",
+          },
+          unitAmount: "0.1",
+          capAmount: 10000,
         },
       ]);
     }),
@@ -173,7 +216,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                 {
                   amountType: "fixed",
                   priceCurrency: "usd",
-                  priceAmount: 3000,
+                  priceAmount: 300000,
                 },
               ],
             },
@@ -311,13 +354,13 @@ describe("ProductResourceAdapter.diff", () => {
               _tag: "FieldChange",
               path: ["prices", 0, "amount"],
               before: "0.01",
-              after: "0.02",
+              after: "2",
             },
             {
               _tag: "FieldChange",
               path: ["prices", 0, "capAmount"],
               before: null,
-              after: "1000",
+              after: "100000",
             },
           ],
         },

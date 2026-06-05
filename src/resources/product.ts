@@ -1,4 +1,10 @@
 import { Schema } from "effect";
+import {
+  majorToMinorUnitAmount,
+  majorToMinorUnitDecimalAmount,
+  normalizeCurrency,
+  optionalMajorToMinorUnitAmount,
+} from "../billing/currency.js";
 import { makeAddress, type ResourceAddress } from "../core/address.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import { MeterAddressSchema, type MeterAddress } from "./meter.js";
@@ -225,40 +231,41 @@ export const meteredUnitPrice = (
   ...(config.capAmount !== undefined ? { capAmount: config.capAmount } : {}),
 });
 
-const amountSpec = (amount: string | number): string => String(amount);
-const optionalAmountSpec = (amount: string | number | null | undefined): string | null =>
-  amount == null ? null : String(amount);
-const currencySpec = (currency: string): string => currency.toLowerCase();
-
 export const productPriceSpec = (price: ProductPriceConfig): ProductPriceSpec => {
   switch (price.type) {
-    case "fixed":
+    case "fixed": {
+      const currency = normalizeCurrency(price.currency);
       return {
         type: "fixed",
-        amount: amountSpec(price.amount),
-        currency: currencySpec(price.currency),
+        amount: majorToMinorUnitAmount(price.amount, currency),
+        currency,
       };
+    }
     case "free":
       return {
         type: "free",
-        currency: currencySpec(price.currency),
+        currency: normalizeCurrency(price.currency),
       };
-    case "custom":
+    case "custom": {
+      const currency = normalizeCurrency(price.currency);
       return {
         type: "custom",
-        currency: currencySpec(price.currency),
-        minimumAmount: optionalAmountSpec(price.minimumAmount),
-        maximumAmount: optionalAmountSpec(price.maximumAmount),
-        presetAmount: optionalAmountSpec(price.presetAmount),
+        currency,
+        minimumAmount: optionalMajorToMinorUnitAmount(price.minimumAmount, currency),
+        maximumAmount: optionalMajorToMinorUnitAmount(price.maximumAmount, currency),
+        presetAmount: optionalMajorToMinorUnitAmount(price.presetAmount, currency),
       };
-    case "meteredUnit":
+    }
+    case "meteredUnit": {
+      const currency = normalizeCurrency(price.currency);
       return {
         type: "meteredUnit",
         meter: decodeMeterAddress(price.meter),
-        amount: amountSpec(price.amount),
-        currency: currencySpec(price.currency),
-        capAmount: optionalAmountSpec(price.capAmount),
+        amount: majorToMinorUnitDecimalAmount(price.amount, currency),
+        currency,
+        capAmount: optionalMajorToMinorUnitAmount(price.capAmount, currency),
       };
+    }
   }
 };
 
