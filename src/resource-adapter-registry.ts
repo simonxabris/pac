@@ -3,34 +3,42 @@ import * as Context from "effect/Context";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
 import { ResourceKindSchema, type ResourceKind } from "./core/kind.js";
 import type { CurrentResource, DesiredResource } from "./core/resource.js";
-import type { ResourceDiffResult } from "./planner.js";
+import type { OperationId } from "./operation-planner/types.js";
+import type { Operation } from "./operations/operation.js";
+import type {
+  ArchivePlanNode,
+  CreatePlanNode,
+  ResourceDiffResult,
+  UpdatePlanNode,
+} from "./planner.js";
 
-export type CreateResourceOperation<Kind extends ResourceKind = ResourceKind, Spec = unknown> = {
-  readonly type: "create";
-  readonly kind: Kind;
-  readonly address: ResourceAddress<Kind>;
-  readonly desired: DesiredResource<Kind, Spec>;
+export type ResourceCreatePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
+  CreatePlanNode & {
+    readonly kind: Kind;
+    readonly desired: DesiredResource<Kind, Spec>;
+  };
+
+export type ResourceUpdatePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
+  UpdatePlanNode & {
+    readonly kind: Kind;
+    readonly desired: DesiredResource<Kind, Spec>;
+    readonly current: CurrentResource<Kind, Spec>;
+  };
+
+export type ResourceArchivePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
+  ArchivePlanNode & {
+    readonly kind: Kind;
+    readonly current: CurrentResource<Kind, Spec>;
+  };
+
+export type ResourceExecutablePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
+  | ResourceCreatePlanNode<Kind, Spec>
+  | ResourceUpdatePlanNode<Kind, Spec>
+  | ResourceArchivePlanNode<Kind, Spec>;
+
+export type CreateOperationsFromPlanContext = {
+  readonly nextOperationId: () => OperationId;
 };
-
-export type UpdateResourceOperation<Kind extends ResourceKind = ResourceKind, Spec = unknown> = {
-  readonly type: "update";
-  readonly kind: Kind;
-  readonly address: ResourceAddress<Kind>;
-  readonly desired: DesiredResource<Kind, Spec>;
-  readonly current: CurrentResource<Kind, Spec>;
-};
-
-export type ArchiveResourceOperation<Kind extends ResourceKind = ResourceKind, Spec = unknown> = {
-  readonly type: "archive";
-  readonly kind: Kind;
-  readonly address: ResourceAddress<Kind>;
-  readonly current: CurrentResource<Kind, Spec>;
-};
-
-export type ResourceOperation<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
-  | CreateResourceOperation<Kind, Spec>
-  | UpdateResourceOperation<Kind, Spec>
-  | ArchiveResourceOperation<Kind, Spec>;
 
 export type ResourceDependency = {
   readonly dependent: ResourceAddress;
@@ -58,18 +66,10 @@ export type ResourceAdapter<Kind extends ResourceKind = ResourceKind, Spec = unk
     current: CurrentResource<Kind, Spec>,
   ) => Effect.Effect<ResourceDiffResult, ResourceAdapterPlanError>;
 
-  readonly create: (
-    desired: DesiredResource<Kind, Spec>,
-  ) => Effect.Effect<ReadonlyArray<ResourceOperation<Kind, Spec>>, ResourceAdapterPlanError>;
-
-  readonly update: (
-    desired: DesiredResource<Kind, Spec>,
-    current: CurrentResource<Kind, Spec>,
-  ) => Effect.Effect<ReadonlyArray<ResourceOperation<Kind, Spec>>, ResourceAdapterPlanError>;
-
-  readonly archive: (
-    current: CurrentResource<Kind, Spec>,
-  ) => Effect.Effect<ReadonlyArray<ResourceOperation<Kind, Spec>>, ResourceAdapterPlanError>;
+  readonly createOperationsFromPlan: (
+    node: ResourceExecutablePlanNode<Kind, Spec>,
+    context: CreateOperationsFromPlanContext,
+  ) => Effect.Effect<ReadonlyArray<Operation>, ResourceAdapterPlanError>;
 };
 
 export type AnyResourceAdapter = {
@@ -84,18 +84,10 @@ export type AnyResourceAdapter = {
     current: CurrentResource,
   ) => Effect.Effect<ResourceDiffResult, ResourceAdapterPlanError>;
 
-  readonly create: (
-    desired: DesiredResource,
-  ) => Effect.Effect<ReadonlyArray<ResourceOperation>, ResourceAdapterPlanError>;
-
-  readonly update: (
-    desired: DesiredResource,
-    current: CurrentResource,
-  ) => Effect.Effect<ReadonlyArray<ResourceOperation>, ResourceAdapterPlanError>;
-
-  readonly archive: (
-    current: CurrentResource,
-  ) => Effect.Effect<ReadonlyArray<ResourceOperation>, ResourceAdapterPlanError>;
+  readonly createOperationsFromPlan: (
+    node: ResourceExecutablePlanNode,
+    context: CreateOperationsFromPlanContext,
+  ) => Effect.Effect<ReadonlyArray<Operation>, ResourceAdapterPlanError>;
 };
 
 export const eraseResourceAdapter = <Kind extends ResourceKind, Spec>(
@@ -106,10 +98,8 @@ export const eraseResourceAdapter = <Kind extends ResourceKind, Spec>(
     adapter.dependencies(resource as DesiredResource<Kind, Spec> | CurrentResource<Kind, Spec>),
   diff: (desired, current) =>
     adapter.diff(desired as DesiredResource<Kind, Spec>, current as CurrentResource<Kind, Spec>),
-  create: (desired) => adapter.create(desired as DesiredResource<Kind, Spec>),
-  update: (desired, current) =>
-    adapter.update(desired as DesiredResource<Kind, Spec>, current as CurrentResource<Kind, Spec>),
-  archive: (current) => adapter.archive(current as CurrentResource<Kind, Spec>),
+  createOperationsFromPlan: (node, context) =>
+    adapter.createOperationsFromPlan(node as ResourceExecutablePlanNode<Kind, Spec>, context),
 });
 
 export class MissingResourceAdapter extends Schema.TaggedErrorClass<MissingResourceAdapter>()(
@@ -126,11 +116,13 @@ export class DuplicateResourceAdapterKind extends Schema.TaggedErrorClass<Duplic
   },
 ) {}
 
+export type ResourceAdapterRegistryShape = {
+  readonly get: (kind: ResourceKind) => Effect.Effect<AnyResourceAdapter, MissingResourceAdapter>;
+};
+
 export class ResourceAdapterRegistry extends Context.Service<
   ResourceAdapterRegistry,
-  {
-    readonly get: (kind: ResourceKind) => Effect.Effect<AnyResourceAdapter, MissingResourceAdapter>;
-  }
+  ResourceAdapterRegistryShape
 >()("@app/ResourceAdapterRegistry") {}
 
 export const makeResourceAdapterRegistryLayer = (

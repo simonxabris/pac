@@ -1,6 +1,17 @@
 import { Effect } from "effect";
+import type { OperationAction } from "../operations/actions.js";
+import type { Operation, RollbackAction } from "../operations/operation.js";
+import type {
+  ProductCreateOperationPayload,
+  ProductPriceCreatePayload,
+} from "../operations/payloads/product.js";
+import type { OperationRef } from "../operations/ref.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
-import type { ResourceAdapter } from "../resource-adapter-registry.js";
+import type {
+  CreateOperationsFromPlanContext,
+  ResourceAdapter,
+  ResourceExecutablePlanNode,
+} from "../resource-adapter-registry.js";
 import type { ProductKind, ProductPriceSpec, ProductSpec } from "./product.js";
 
 const valuesEqual = (left: unknown, right: unknown): boolean =>
@@ -93,6 +104,155 @@ const diffProductPrices = (
   }
 };
 
+const polarIdRef = (address: OperationRef["address"]): OperationRef => ({
+  _tag: "Ref",
+  address,
+  field: "polarId",
+});
+
+const unsupportedRollback = (reason: string): RollbackAction => ({
+  _tag: "UnsupportedRollback",
+  reason,
+});
+
+const managedMetadata = (kind: ProductKind, address: OperationRef["address"], key: string) => ({
+  paac: JSON.stringify({
+    v: 1,
+    kind,
+    addr: address,
+    key,
+  }),
+});
+
+const numberAmount = (amount: string | null): number | null =>
+  amount === null ? null : Number(amount);
+
+const productPriceCreatePayload = (price: ProductPriceSpec): ProductPriceCreatePayload => {
+  switch (price.type) {
+    case "fixed":
+      return {
+        amountType: "fixed",
+        priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
+        priceAmount: Number(price.amount),
+      };
+    case "free":
+      return {
+        amountType: "free",
+        priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
+      };
+    case "custom": {
+      const payload: ProductPriceCreatePayload = {
+        amountType: "custom",
+        priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
+        ...(price.minimumAmount === null ? {} : { minimumAmount: Number(price.minimumAmount) }),
+        maximumAmount: numberAmount(price.maximumAmount),
+        presetAmount: numberAmount(price.presetAmount),
+      };
+      return payload;
+    }
+    case "meteredUnit":
+      return {
+        amountType: "metered_unit",
+        priceCurrency: price.currency as ProductPriceCreatePayload["priceCurrency"],
+        meterId: polarIdRef(price.meter),
+        unitAmount: price.amount,
+        capAmount: numberAmount(price.capAmount),
+      };
+  }
+};
+
+const productCreatePayload = (
+  desired: ResourceExecutablePlanNode<ProductKind, ProductSpec> & { readonly _tag: "Create" },
+): ProductCreateOperationPayload => {
+  const base = {
+    metadata: managedMetadata(desired.kind, desired.address, desired.desired.key),
+    name: desired.desired.spec.name,
+    description: desired.desired.spec.description,
+    visibility: desired.desired.spec.visibility,
+    prices: desired.desired.spec.prices.map(productPriceCreatePayload),
+  };
+
+  if (desired.desired.spec.recurringInterval === null) {
+    return {
+      ...base,
+      recurringInterval: null,
+      recurringIntervalCount: null,
+    };
+  }
+
+  return {
+    ...base,
+    recurringInterval: desired.desired.spec.recurringInterval,
+    recurringIntervalCount: desired.desired.spec.recurringIntervalCount ?? 1,
+  };
+};
+
+const createProductOperationFromPlanNode = (
+  node: ResourceExecutablePlanNode<ProductKind, ProductSpec>,
+  context: CreateOperationsFromPlanContext,
+): Operation => {
+  const id = context.nextOperationId();
+
+  switch (node._tag) {
+    case "Create":
+      return {
+        _tag: "Operation",
+        id,
+        address: node.address,
+        kind: "product",
+        action: {
+          _tag: "CreateProduct",
+          payload: productCreatePayload(node),
+        },
+        rollback: {
+          _tag: "RollbackOperation",
+          action: {
+            _tag: "ArchiveProduct",
+            id: polarIdRef(node.address),
+          },
+        },
+      };
+    case "Update": {
+      const action: OperationAction = {
+        _tag: "UpdateProduct",
+        id: node.current.polarId,
+        payload: {
+          spec: node.desired.spec,
+          changes: node.changes,
+        },
+      };
+
+      return {
+        _tag: "Operation",
+        id,
+        address: node.address,
+        kind: "product",
+        action,
+        rollback: {
+          _tag: "RollbackOperation",
+          action: {
+            _tag: "UpdateProduct",
+            id: node.current.polarId,
+            payload: node.current.spec,
+          },
+        },
+      };
+    }
+    case "Archive":
+      return {
+        _tag: "Operation",
+        id,
+        address: node.address,
+        kind: "product",
+        action: {
+          _tag: "ArchiveProduct",
+          id: node.current.polarId,
+        },
+        rollback: unsupportedRollback("Archive rollback is not implemented yet."),
+      };
+  }
+};
+
 export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> = {
   kind: "product",
 
@@ -178,34 +338,6 @@ export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> =
       };
     }),
 
-  create: (desired) =>
-    Effect.succeed([
-      {
-        type: "create",
-        kind: "product",
-        address: desired.address,
-        desired,
-      },
-    ]),
-
-  update: (desired, current) =>
-    Effect.succeed([
-      {
-        type: "update",
-        kind: "product",
-        address: desired.address,
-        desired,
-        current,
-      },
-    ]),
-
-  archive: (current) =>
-    Effect.succeed([
-      {
-        type: "archive",
-        kind: "product",
-        address: current.address,
-        current,
-      },
-    ]),
+  createOperationsFromPlan: (node, context) =>
+    Effect.succeed([createProductOperationFromPlanNode(node, context)]),
 };
