@@ -1,7 +1,9 @@
+import type { ExistingProductPrice } from "@polar-sh/sdk/models/components/existingproductprice.js";
 import type { ProductPriceCustomCreate } from "@polar-sh/sdk/models/components/productpricecustomcreate.js";
 import type { ProductPriceFixedCreate } from "@polar-sh/sdk/models/components/productpricefixedcreate.js";
 import type { ProductPriceFreeCreate } from "@polar-sh/sdk/models/components/productpricefreecreate.js";
 import type { ProductPriceMeteredUnitCreate } from "@polar-sh/sdk/models/components/productpricemeteredunitcreate.js";
+import type { ProductUpdate } from "@polar-sh/sdk/models/components/productupdate.js";
 import type { Resolvable } from "../ref.js";
 
 export type ProductPriceMeteredUnitCreatePayload = Omit<ProductPriceMeteredUnitCreate, "meterId"> & {
@@ -30,3 +32,13 @@ export type ProductCreateOperationPayload = {
     readonly recurringIntervalCount: null;
   }
 );
+
+export type ProductUpdatePricePayload = ExistingProductPrice | ProductPriceCreatePayload;
+
+export type ProductUpdateOperationPayload = Omit<ProductUpdate, "prices"> & {
+  prices?: ReadonlyArray<ProductUpdatePricePayload> | null | undefined;
+};
+
+export type ProductArchiveOperationPayload = {
+  readonly isArchived: true;
+};

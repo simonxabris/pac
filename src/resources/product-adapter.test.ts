@@ -117,6 +117,90 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                 address: "product.pro",
                 field: "polarId",
               },
+              payload: { isArchived: true },
+            },
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("creates Polar-shaped update product payloads and rollback payloads", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        description: "New description",
+        visibility: "public",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, {
+        ...desired.spec,
+        name: "Old Pro",
+        description: "Old description",
+        visibility: "private",
+        prices: [fixedPrice({ amount: "2000", currency: "usd" })].map((price) => ({
+          type: "fixed" as const,
+          amount: String(price.amount),
+          currency: price.currency,
+        })),
+      });
+
+      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "product",
+          desired,
+          current,
+          changes: [
+            { _tag: "FieldChange", path: ["name"], before: "Old Pro", after: "Pro" },
+            { _tag: "FieldChange", path: ["description"], before: "Old description", after: "New description" },
+            { _tag: "FieldChange", path: ["visibility"], before: "private", after: "public" },
+            { _tag: "FieldChange", path: ["prices", 0, "amount"], before: "2000", after: "3000" },
+          ],
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations).toEqual([
+        {
+          _tag: "Operation",
+          id: "op_1",
+          address: "product.pro",
+          kind: "product",
+          action: {
+            _tag: "UpdateProduct",
+            id: "polar-pro",
+            payload: {
+              name: "Pro",
+              description: "New description",
+              visibility: "public",
+              prices: [
+                {
+                  amountType: "fixed",
+                  priceCurrency: "usd",
+                  priceAmount: 3000,
+                },
+              ],
+            },
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProduct",
+              id: "polar-pro",
+              payload: {
+                name: "Old Pro",
+                description: "Old description",
+                visibility: "private",
+                prices: [
+                  {
+                    amountType: "fixed",
+                    priceCurrency: "usd",
+                    priceAmount: 2000,
+                  },
+                ],
+              },
             },
           },
         },

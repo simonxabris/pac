@@ -4,6 +4,7 @@ import type { Operation, RollbackAction } from "../operations/operation.js";
 import type {
   ProductCreateOperationPayload,
   ProductPriceCreatePayload,
+  ProductUpdateOperationPayload,
 } from "../operations/payloads/product.js";
 import type { OperationRef } from "../operations/ref.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
@@ -187,6 +188,36 @@ const productCreatePayload = (
   };
 };
 
+const hasChanged = (
+  changes: ReadonlyArray<FieldChange>,
+  field: keyof ProductSpec,
+): boolean => changes.some((change) => change.path[0] === field);
+
+const productUpdatePayload = (
+  spec: ProductSpec,
+  changes: ReadonlyArray<FieldChange>,
+): ProductUpdateOperationPayload => {
+  const payload: ProductUpdateOperationPayload = {};
+
+  if (hasChanged(changes, "name")) {
+    payload.name = spec.name;
+  }
+
+  if (hasChanged(changes, "description")) {
+    payload.description = spec.description;
+  }
+
+  if (hasChanged(changes, "visibility")) {
+    payload.visibility = spec.visibility;
+  }
+
+  if (hasChanged(changes, "prices")) {
+    payload.prices = spec.prices.map(productPriceCreatePayload);
+  }
+
+  return payload;
+};
+
 const createProductOperationFromPlanNode = (
   node: ResourceExecutablePlanNode<ProductKind, ProductSpec>,
   context: CreateOperationsFromPlanContext,
@@ -209,6 +240,7 @@ const createProductOperationFromPlanNode = (
           action: {
             _tag: "ArchiveProduct",
             id: polarIdRef(node.address),
+            payload: { isArchived: true },
           },
         },
       };
@@ -216,10 +248,7 @@ const createProductOperationFromPlanNode = (
       const action: OperationAction = {
         _tag: "UpdateProduct",
         id: node.current.polarId,
-        payload: {
-          spec: node.desired.spec,
-          changes: node.changes,
-        },
+        payload: productUpdatePayload(node.desired.spec, node.changes),
       };
 
       return {
@@ -233,7 +262,7 @@ const createProductOperationFromPlanNode = (
           action: {
             _tag: "UpdateProduct",
             id: node.current.polarId,
-            payload: node.current.spec,
+            payload: productUpdatePayload(node.current.spec, node.changes),
           },
         },
       };
@@ -247,6 +276,7 @@ const createProductOperationFromPlanNode = (
         action: {
           _tag: "ArchiveProduct",
           id: node.current.polarId,
+          payload: { isArchived: true },
         },
         rollback: unsupportedRollback("Archive rollback is not implemented yet."),
       };

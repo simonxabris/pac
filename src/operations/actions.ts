@@ -1,4 +1,8 @@
-import type { ProductCreateOperationPayload } from "./payloads/product.js";
+import type {
+  ProductArchiveOperationPayload,
+  ProductCreateOperationPayload,
+  ProductUpdateOperationPayload,
+} from "./payloads/product.js";
 import type { Resolvable } from "./ref.js";
 
 export type CreateMeterAction = {
@@ -25,12 +29,13 @@ export type CreateProductAction = {
 export type UpdateProductAction = {
   readonly _tag: "UpdateProduct";
   readonly id: Resolvable<string>;
-  readonly payload: unknown;
+  readonly payload: ProductUpdateOperationPayload;
 };
 
 export type ArchiveProductAction = {
   readonly _tag: "ArchiveProduct";
   readonly id: Resolvable<string>;
+  readonly payload: ProductArchiveOperationPayload;
 };
 
 export type OperationAction =
