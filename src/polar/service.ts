@@ -11,8 +11,13 @@ import type { RemoteMeter, RemoteProduct } from "./client.js";
 
 export type PolarClientShape = {
   readonly listProducts: () => Effect.Effect<ReadonlyArray<RemoteProduct>, PolarClientError>;
-  readonly createProduct: (payload: ProductCreate) => Effect.Effect<RemoteProduct, PolarClientError>;
-  readonly updateProduct: (id: string, payload: ProductUpdate) => Effect.Effect<RemoteProduct, PolarClientError>;
+  readonly createProduct: (
+    payload: ProductCreate,
+  ) => Effect.Effect<RemoteProduct, PolarClientError>;
+  readonly updateProduct: (
+    id: string,
+    payload: ProductUpdate,
+  ) => Effect.Effect<RemoteProduct, PolarClientError>;
   readonly archiveProduct: (id: string) => Effect.Effect<RemoteProduct, PolarClientError>;
   readonly updateProductBenefits: (
     id: string,
@@ -20,7 +25,10 @@ export type PolarClientShape = {
   ) => Effect.Effect<RemoteProduct, PolarClientError>;
   readonly listMeters: () => Effect.Effect<ReadonlyArray<RemoteMeter>, PolarClientError>;
   readonly createMeter: (payload: MeterCreate) => Effect.Effect<RemoteMeter, PolarClientError>;
-  readonly updateMeter: (id: string, payload: MeterUpdate) => Effect.Effect<RemoteMeter, PolarClientError>;
+  readonly updateMeter: (
+    id: string,
+    payload: MeterUpdate,
+  ) => Effect.Effect<RemoteMeter, PolarClientError>;
   readonly archiveMeter: (id: string) => Effect.Effect<RemoteMeter, PolarClientError>;
 };
 
@@ -30,7 +38,7 @@ export class PolarClientError extends Schema.TaggedErrorClass<PolarClientError>(
     operation: Schema.String,
     message: Schema.String,
   },
-) {}
+) { }
 
 const errorMessage = (cause: unknown): string => {
   if (cause instanceof Error) return cause.message;
@@ -51,7 +59,9 @@ const fromPromise = <A>(
     catch: (cause) => new PolarClientError({ operation, message: errorMessage(cause) }),
   });
 
-export class PolarClient extends Context.Service<PolarClient, PolarClientShape>()("@paac/PolarClient") {
+export class PolarClient extends Context.Service<PolarClient, PolarClientShape>()(
+  "@paac/PolarClient",
+) {
   static readonly layer = Layer.effect(
     PolarClient,
     Effect.gen(function*() {
@@ -59,6 +69,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
       const sdk = new Polar({
         accessToken: Redacted.value(config.polarAccessToken),
         server: config.polarEnv,
+        serverURL: config.polarServerUrl,
       });
 
       const listProducts = Effect.fn("PolarClient.listProducts")(() =>

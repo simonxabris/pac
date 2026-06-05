@@ -8,7 +8,7 @@ import * as Redacted from "effect/Redacted";
 export type AppConfigShape = {
   readonly polarAccessToken: Redacted.Redacted<string>;
   readonly polarEnv: "production" | "sandbox";
-  readonly polarServerUrl: string;
+  readonly polarServerUrl: string | undefined;
 };
 
 const config = {
