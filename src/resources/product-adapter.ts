@@ -5,55 +5,32 @@ import {
   polarIntegerMinorUnitNumber,
 } from "../currency/currency.js";
 import type { OperationAction } from "../operations/actions.js";
-import type { Operation, RollbackAction } from "../operations/operation.js";
+import type { Operation } from "../operations/operation.js";
 import type {
   ProductCreateOperationPayload,
   ProductPriceCreatePayload,
   ProductUpdateOperationPayload,
   ProductUpdatePricePayload,
 } from "../operations/payloads/product.js";
-import type { OperationRef } from "../operations/ref.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
 import type {
   CreateOperationsFromPlanContext,
   ResourceAdapter,
   ResourceExecutablePlanNode,
 } from "../resource-adapter-registry.js";
+import {
+  managedMetadata,
+  polarIdRef,
+  pushFieldChange,
+  unsupportedRollback,
+  valuesEqual,
+} from "./adapter-utils.js";
 import type {
   CurrentProductProviderState,
   ProductKind,
   ProductPriceSpec,
   ProductSpec,
 } from "./product.js";
-
-const valuesEqual = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
-const fieldChange = (
-  path: ReadonlyArray<string | number>,
-  before: unknown,
-  after: unknown,
-): FieldChange | undefined =>
-  valuesEqual(before, after)
-    ? undefined
-    : {
-      _tag: "FieldChange",
-      path,
-      before,
-      after,
-    };
-
-const pushFieldChange = (
-  changes: Array<FieldChange>,
-  path: ReadonlyArray<string | number>,
-  before: unknown,
-  after: unknown,
-): void => {
-  const change = fieldChange(path, before, after);
-  if (change !== undefined) {
-    changes.push(change);
-  }
-};
 
 type ProductPriceField =
   | "type"
@@ -115,26 +92,6 @@ const diffProductPrices = (
     }
   }
 };
-
-const polarIdRef = (address: OperationRef["address"]): OperationRef => ({
-  _tag: "Ref",
-  address,
-  field: "polarId",
-});
-
-const unsupportedRollback = (reason: string): RollbackAction => ({
-  _tag: "UnsupportedRollback",
-  reason,
-});
-
-const managedMetadata = (kind: ProductKind, address: OperationRef["address"], key: string) => ({
-  paac: JSON.stringify({
-    v: 1,
-    kind,
-    addr: address,
-    key,
-  }),
-});
 
 const productPriceCreatePayload = (price: ProductPriceSpec): ProductPriceCreatePayload => {
   switch (price.type) {

@@ -497,7 +497,7 @@ land with tests at the resource, adapter, or service boundary it changes.
      `rollover` defaulting, description/unit validation, and canonical
      `BenefitSpec` output.
 
-3. [ ] Add Benefit operation payloads and adapter planning.
+3. [x] Add Benefit operation payloads and adapter planning.
    - Deliverable: a managed Benefit can produce create, update, noop, blocked,
      and delete-mode remove plan/operation output without calling Polar.
    - Scope: `src/operations/payloads/benefit.ts`, Benefit operation action

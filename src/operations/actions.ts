@@ -1,4 +1,8 @@
 import type {
+  BenefitCreateOperationPayload,
+  BenefitUpdateOperationPayload,
+} from "./payloads/benefit.js";
+import type {
   MeterArchiveOperationPayload,
   MeterCreateOperationPayload,
   MeterUpdateOperationPayload,
@@ -27,6 +31,22 @@ export type ArchiveMeterAction = {
   readonly payload: MeterArchiveOperationPayload;
 };
 
+export type CreateBenefitAction = {
+  readonly _tag: "CreateBenefit";
+  readonly payload: BenefitCreateOperationPayload;
+};
+
+export type UpdateBenefitAction = {
+  readonly _tag: "UpdateBenefit";
+  readonly id: Resolvable<string>;
+  readonly payload: BenefitUpdateOperationPayload;
+};
+
+export type DeleteBenefitAction = {
+  readonly _tag: "DeleteBenefit";
+  readonly id: Resolvable<string>;
+};
+
 export type CreateProductAction = {
   readonly _tag: "CreateProduct";
   readonly payload: ProductCreateOperationPayload;
@@ -48,6 +68,9 @@ export type OperationAction =
   | CreateMeterAction
   | UpdateMeterAction
   | ArchiveMeterAction
+  | CreateBenefitAction
+  | UpdateBenefitAction
+  | DeleteBenefitAction
   | CreateProductAction
   | UpdateProductAction
   | ArchiveProductAction;

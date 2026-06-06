@@ -120,6 +120,11 @@ export class Executor extends Context.Service<
           case "ArchiveMeter":
             return polar.archiveMeter(action.id);
 
+          case "CreateBenefit":
+          case "UpdateBenefit":
+          case "DeleteBenefit":
+            return Effect.die(new Error("Benefit operation execution is not implemented yet."));
+
           case "CreateProduct":
             return polar.createProduct(
               action.payload as unknown as Parameters<typeof polar.createProduct>[0],

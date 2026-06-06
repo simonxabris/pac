@@ -1,56 +1,23 @@
 import { Effect } from "effect";
 import type { OperationAction } from "../operations/actions.js";
-import type { Operation, RollbackAction } from "../operations/operation.js";
+import type { Operation } from "../operations/operation.js";
 import type {
   MeterCreateOperationPayload,
   MeterUpdateOperationPayload,
 } from "../operations/payloads/meter.js";
-import type { OperationRef } from "../operations/ref.js";
 import type { FieldChange } from "../planner.js";
 import type {
   CreateOperationsFromPlanContext,
   ResourceAdapter,
   ResourceExecutablePlanNode,
 } from "../resource-adapter-registry.js";
+import {
+  managedMetadata,
+  polarIdRef,
+  pushFieldChange,
+  unsupportedRollback,
+} from "./adapter-utils.js";
 import type { MeterKind, MeterSpec } from "./meter.js";
-
-const valuesEqual = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
-const pushFieldChange = (
-  changes: Array<FieldChange>,
-  path: ReadonlyArray<string | number>,
-  before: unknown,
-  after: unknown,
-): void => {
-  if (valuesEqual(before, after)) return;
-  changes.push({
-    _tag: "FieldChange",
-    path,
-    before,
-    after,
-  });
-};
-
-const polarIdRef = (address: OperationRef["address"]): OperationRef => ({
-  _tag: "Ref",
-  address,
-  field: "polarId",
-});
-
-const unsupportedRollback = (reason: string): RollbackAction => ({
-  _tag: "UnsupportedRollback",
-  reason,
-});
-
-const managedMetadata = (kind: MeterKind, address: OperationRef["address"], key: string) => ({
-  paac: JSON.stringify({
-    v: 1,
-    kind,
-    addr: address,
-    key,
-  }),
-});
 
 const meterCreatePayload = (
   node: ResourceExecutablePlanNode<MeterKind, MeterSpec> & { readonly _tag: "Create" },
