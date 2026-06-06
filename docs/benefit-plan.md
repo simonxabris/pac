@@ -506,7 +506,7 @@ land with tests at the resource, adapter, or service boundary it changes.
      diffing, blocked type changes, create/update/delete payloads, removal mode
      `delete`, and rollback behavior.
 
-4. [ ] Add Polar Benefit client/service methods.
+4. [x] Add Polar Benefit client/service methods.
    - Deliverable: `PolarClient` exposes `listBenefits`, `createBenefit`,
      `updateBenefit`, and `deleteBenefit` with typed payload/result shapes.
    - Scope: `src/polar/client.ts` / `src/polar/service.ts` and any shared remote

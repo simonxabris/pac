@@ -15,7 +15,7 @@ import type { PolarClientShape } from "./polar/service.js";
 import { PolarClient } from "./polar/service.js";
 import type { ResourceAddress } from "./core/address.js";
 import type { ResourceKind } from "./core/kind.js";
-import type { RemoteMeter, RemoteProduct } from "./polar/client.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./polar/client.js";
 
 type PolarCall =
   | { readonly method: "createProduct"; readonly payload: unknown }
@@ -135,6 +135,10 @@ const fakePolarClientLayer = (calls: Array<PolarCall>) =>
   Layer.succeed(
     PolarClient,
     PolarClient.of({
+      listBenefits: () => Effect.succeed([]),
+      createBenefit: () => Effect.succeed({ id: "ben_created" } as RemoteBenefit),
+      updateBenefit: (id) => Effect.succeed({ id } as RemoteBenefit),
+      deleteBenefit: () => Effect.succeed(undefined),
       listProducts: () => Effect.succeed([]),
       createProduct: (payload) =>
         Effect.sync(() => {

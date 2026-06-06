@@ -1,15 +1,26 @@
 import { Polar } from "@polar-sh/sdk";
+import type { BenefitCreate } from "@polar-sh/sdk/models/components/benefitcreate.js";
 import type { MeterCreate } from "@polar-sh/sdk/models/components/metercreate.js";
 import type { MeterUpdate } from "@polar-sh/sdk/models/components/meterupdate.js";
 import type { ProductCreate } from "@polar-sh/sdk/models/components/productcreate.js";
 import type { ProductBenefitsUpdate } from "@polar-sh/sdk/models/components/productbenefitsupdate.js";
 import type { ProductUpdate } from "@polar-sh/sdk/models/components/productupdate.js";
+import type { BenefitsUpdateBenefitUpdate } from "@polar-sh/sdk/models/operations/benefitsupdate.js";
 import { Effect, Layer, Redacted, Schema } from "effect";
 import * as Context from "effect/Context";
 import { AppConfig } from "../config/service.js";
-import type { RemoteMeter, RemoteProduct } from "./client.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./client.js";
 
 export type PolarClientShape = {
+  readonly listBenefits: () => Effect.Effect<ReadonlyArray<RemoteBenefit>, PolarClientError>;
+  readonly createBenefit: (
+    payload: BenefitCreate,
+  ) => Effect.Effect<RemoteBenefit, PolarClientError>;
+  readonly updateBenefit: (
+    id: string,
+    payload: BenefitsUpdateBenefitUpdate,
+  ) => Effect.Effect<RemoteBenefit, PolarClientError>;
+  readonly deleteBenefit: (id: string) => Effect.Effect<void, PolarClientError>;
   readonly listProducts: () => Effect.Effect<ReadonlyArray<RemoteProduct>, PolarClientError>;
   readonly createProduct: (
     payload: ProductCreate,
@@ -72,6 +83,30 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
         serverURL: config.polarServerUrl,
       });
 
+      const listBenefits = Effect.fn("PolarClient.listBenefits")(() =>
+        fromPromise("benefits.list", async () => {
+          const iterator = await sdk.benefits.list({ limit: 100 });
+          const benefits: Array<RemoteBenefit> = [];
+          for await (const page of iterator) {
+            benefits.push(...page.result.items);
+          }
+          return benefits;
+        }),
+      );
+
+      const createBenefit = Effect.fn("PolarClient.createBenefit")((payload: BenefitCreate) =>
+        fromPromise("benefits.create", () => sdk.benefits.create(payload)),
+      );
+
+      const updateBenefit = Effect.fn("PolarClient.updateBenefit")(
+        (id: string, payload: BenefitsUpdateBenefitUpdate) =>
+          fromPromise("benefits.update", () => sdk.benefits.update({ id, requestBody: payload })),
+      );
+
+      const deleteBenefit = Effect.fn("PolarClient.deleteBenefit")((id: string) =>
+        fromPromise("benefits.delete", () => sdk.benefits.delete({ id })),
+      );
+
       const listProducts = Effect.fn("PolarClient.listProducts")(() =>
         fromPromise("products.list", async () => {
           const iterator = await sdk.products.list({ limit: 100 });
@@ -130,6 +165,10 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
       );
 
       return PolarClient.of({
+        listBenefits,
+        createBenefit,
+        updateBenefit,
+        deleteBenefit,
         listProducts,
         createProduct,
         updateProduct,
