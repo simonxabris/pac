@@ -227,6 +227,24 @@ const shiftDecimalRight = (input: CurrencyAmountInput, places: number): DecimalP
   };
 };
 
+const shiftDecimalLeft = (input: CurrencyAmountInput, places: number): DecimalParts => {
+  const parts = parseNonNegativeDecimal(input);
+  const digits = `${parts.whole}${parts.fraction}`;
+  const decimalIndex = parts.whole.length - places;
+
+  if (decimalIndex <= 0) {
+    return {
+      whole: "0",
+      fraction: `${"0".repeat(Math.abs(decimalIndex))}${digits}`,
+    };
+  }
+
+  return {
+    whole: stripLeadingZeroes(digits.slice(0, decimalIndex)),
+    fraction: digits.slice(decimalIndex),
+  };
+};
+
 const assertIntegerDecimal = (amount: DecimalParts, source: CurrencyAmountInput): string => {
   if (/[^0]/.test(amount.fraction)) {
     throw new Error(`Currency amount '${String(source)}' cannot be represented as integer minor units.`);
@@ -245,6 +263,55 @@ export const optionalMajorToMinorUnitAmount = (
   amount: CurrencyAmountInput | null | undefined,
   currency: string,
 ): string | null => amount == null ? null : majorToMinorUnitAmount(amount, currency);
+
+export const minorToMajorUnitAmount = (
+  amount: CurrencyAmountInput,
+  currency: string,
+): string => formatDecimal(shiftDecimalLeft(amount, decimalFactorPlaces(currency)));
+
+export const optionalMinorToMajorUnitAmount = (
+  amount: CurrencyAmountInput | null | undefined,
+  currency: string,
+): string | null => amount == null ? null : minorToMajorUnitAmount(amount, currency);
+
+export type FormatCurrencyAmountOptions = {
+  readonly locale?: Intl.LocalesArgument;
+  readonly currencyDisplay?: Intl.NumberFormatOptions["currencyDisplay"];
+};
+
+const decimalFractionDigits = (amount: string): number => amount.split(".")[1]?.length ?? 0;
+
+export const formatMajorUnitAmount = (
+  amount: CurrencyAmountInput,
+  currency: string,
+  options: FormatCurrencyAmountOptions = {},
+): string => {
+  const normalizedCurrency = normalizeCurrency(currency);
+  const majorAmount = formatDecimal(parseNonNegativeDecimal(amount));
+  const currencyCode = normalizedCurrency.toUpperCase();
+  const defaults = new Intl.NumberFormat(options.locale, {
+    style: "currency",
+    currency: currencyCode,
+    currencyDisplay: options.currencyDisplay ?? "symbol",
+  }).resolvedOptions();
+
+  const minimumFractionDigits = defaults.minimumFractionDigits ?? 0;
+  const maximumFractionDigits = defaults.maximumFractionDigits ?? minimumFractionDigits;
+
+  return new Intl.NumberFormat(options.locale, {
+    style: "currency",
+    currency: currencyCode,
+    currencyDisplay: options.currencyDisplay ?? "symbol",
+    minimumFractionDigits,
+    maximumFractionDigits: Math.max(maximumFractionDigits, decimalFractionDigits(majorAmount)),
+  }).format(Number(majorAmount));
+};
+
+export const formatMinorUnitAmount = (
+  amount: CurrencyAmountInput,
+  currency: string,
+  options: FormatCurrencyAmountOptions = {},
+): string => formatMajorUnitAmount(minorToMajorUnitAmount(amount, currency), currency, options);
 
 export const polarIntegerMinorUnitAmount = (
   amount: CurrencyAmountInput,

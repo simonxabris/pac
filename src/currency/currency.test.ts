@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   currencyDecimalFactor,
+  formatMinorUnitAmount,
   majorToMinorUnitAmount,
   majorToMinorUnitDecimalAmount,
+  minorToMajorUnitAmount,
   normalizeCurrency,
   optionalMajorToMinorUnitAmount,
   optionalPolarIntegerMinorUnitAmount,
@@ -43,6 +45,19 @@ describe("currency amounts", () => {
     expect(optionalMajorToMinorUnitAmount(null, "usd")).toBeNull();
     expect(optionalMajorToMinorUnitAmount(undefined, "usd")).toBeNull();
     expect(optionalMajorToMinorUnitAmount(30, "usd")).toBe("3000");
+  });
+
+  it("converts minor unit amounts back to major units", () => {
+    expect(minorToMajorUnitAmount("4000", "usd")).toBe("40");
+    expect(minorToMajorUnitAmount("1234", "usd")).toBe("12.34");
+    expect(minorToMajorUnitAmount("40", "jpy")).toBe("40");
+    expect(minorToMajorUnitAmount("0.1", "usd")).toBe("0.001");
+  });
+
+  it("formats minor unit amounts as localized currency values", () => {
+    expect(formatMinorUnitAmount("4000", "usd", { locale: "en-US" })).toBe("$40.00");
+    expect(formatMinorUnitAmount("40", "jpy", { locale: "en-US" })).toBe("¥40");
+    expect(formatMinorUnitAmount("0.1", "usd", { locale: "en-US" })).toBe("$0.001");
   });
 
   it("normalizes integer minor unit amounts from Polar", () => {
