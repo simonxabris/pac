@@ -514,7 +514,7 @@ land with tests at the resource, adapter, or service boundary it changes.
    - Tests: service-level tests or focused client-shape tests proving the Polar
      SDK calls are mapped to the expected methods and payload wrappers.
 
-5. [ ] Add remote Benefit fetching and decoding.
+5. [x] Add remote Benefit fetching and decoding.
    - Deliverable: managed remote meter-credit Benefits are decoded into current
      Benefit resources and skipped when already removed.
    - Scope: `src/remote-resource-fetcher.ts`, including concurrent Benefit

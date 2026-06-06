@@ -12,6 +12,10 @@ import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "
 import type { CurrentResource } from "./core/resource.js";
 import { PolarClient } from "./polar/service.js";
 import {
+  CurrentBenefitResourceSchema,
+  type CurrentBenefitResource,
+} from "./resources/benefit.js";
+import {
   CurrentMeterResourceSchema,
   MeterAddressSchema,
   MeterAggregationSpecSchema,
@@ -116,6 +120,24 @@ const RemoteProductResourceInput = Schema.Struct({
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
 });
 
+const RemoteBenefitMeterCreditSdk = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("meter_credit"),
+  description: Schema.String,
+  isDeleted: Schema.Boolean,
+  metadata: MetadataRecord,
+  properties: Schema.Struct({
+    units: Schema.Number,
+    rollover: Schema.Boolean,
+    meterId: Schema.String,
+  }),
+});
+
+const RemoteBenefitResourceInput = Schema.Struct({
+  benefit: RemoteBenefitMeterCreditSdk,
+  meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
+});
+
 const RemoteMeterSdk = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -161,7 +183,7 @@ const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIden
 };
 
 const identityForKind = (
-  kind: "product" | "meter",
+  kind: "product" | "meter" | "benefit",
   metadata: typeof MetadataRecord.Type,
 ): ManagedIdentity => {
   const identity = parseManagedIdentity(metadata);
@@ -304,6 +326,54 @@ const productResourceToRemoteInput = (
   meterAddressesById: {},
 });
 
+const benefitToCurrentResource = ({
+  benefit,
+  meterAddressesById,
+}: typeof RemoteBenefitResourceInput.Type): CurrentBenefitResource => {
+  const identity = identityForKind("benefit", benefit.metadata);
+  const meterAddress = meterAddressesById[benefit.properties.meterId];
+  if (meterAddress === undefined) {
+    throw new Error(
+      `Meter-credit benefit references unmanaged or unknown meter '${benefit.properties.meterId}'.`,
+    );
+  }
+
+  return {
+    source: "current",
+    kind: "benefit",
+    key: identity.key,
+    address: identity.address as `benefit.${string}`,
+    polarId: benefit.id,
+    isRemoved: benefit.isDeleted,
+    spec: {
+      type: "meter-credit",
+      description: benefit.description,
+      meter: meterAddress,
+      units: benefit.properties.units,
+      rollover: benefit.properties.rollover,
+    },
+    raw: benefit,
+  };
+};
+
+const benefitResourceToRemoteInput = (
+  resource: CurrentBenefitResource,
+): typeof RemoteBenefitResourceInput.Type => ({
+  benefit: {
+    id: resource.polarId,
+    type: "meter_credit",
+    description: resource.spec.description,
+    isDeleted: resource.isRemoved,
+    metadata: {},
+    properties: {
+      units: resource.spec.units,
+      rollover: resource.spec.rollover,
+      meterId: resource.spec.meter,
+    },
+  },
+  meterAddressesById: {},
+});
+
 const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeterResource => {
   const identity = identityForKind("meter", meter.metadata);
   return {
@@ -336,6 +406,19 @@ const meterResourceToRemote = (resource: CurrentMeterResource): typeof RemoteMet
   metadata: {},
 });
 
+export const RemoteBenefitResourceSchema = RemoteBenefitResourceInput.pipe(
+  Schema.decodeTo(CurrentBenefitResourceSchema, {
+    decode: SchemaGetter.transformOrFail((input) =>
+      Effect.try({
+        try: () => benefitToCurrentResource(input),
+        catch: (cause) =>
+          schemaIssue(input, cause instanceof Error ? cause.message : String(cause)),
+      }),
+    ),
+    encode: SchemaGetter.transform(benefitResourceToRemoteInput),
+  }),
+);
+
 export const RemoteProductResourceSchema = RemoteProductResourceInput.pipe(
   Schema.decodeTo(CurrentProductResourceSchema, {
     decode: SchemaGetter.transformOrFail((input) =>
@@ -362,6 +445,7 @@ export const RemoteMeterResourceSchema = RemoteMeterSdk.pipe(
   }),
 );
 
+export const decodeRemoteBenefitResource = Schema.decodeUnknownEffect(RemoteBenefitResourceSchema);
 export const decodeRemoteProductResource = Schema.decodeUnknownEffect(RemoteProductResourceSchema);
 export const decodeRemoteMeterResource = Schema.decodeUnknownEffect(RemoteMeterResourceSchema);
 
@@ -378,17 +462,6 @@ export class DuplicateRemoteResourceAddress extends Schema.TaggedErrorClass<Dupl
     address: ResourceAddressSchema,
   },
 ) { }
-
-const putRemoteResource = (
-  map: Map<ResourceAddress, CurrentResource>,
-  resource: CurrentResource,
-): Effect.Effect<void, DuplicateRemoteResourceAddress> => {
-  if (map.has(resource.address)) {
-    return Effect.fail(new DuplicateRemoteResourceAddress({ address: resource.address }));
-  }
-  map.set(resource.address, resource);
-  return Effect.void;
-};
 
 export class RemoteResourceFetcher extends Context.Service<
   RemoteResourceFetcher,
@@ -407,8 +480,8 @@ export class RemoteResourceFetcher extends Context.Service<
       return RemoteResourceFetcher.of({
         fetch: () =>
           Effect.gen(function*() {
-            const [remoteProducts, remoteMeters] = yield* Effect.all(
-              [polar.listProducts(), polar.listMeters()] as const,
+            const [remoteProducts, remoteMeters, remoteBenefits] = yield* Effect.all(
+              [polar.listProducts(), polar.listMeters(), polar.listBenefits()] as const,
               { concurrency: "unbounded" },
             ).pipe(
               Effect.mapError(
@@ -437,6 +510,20 @@ export class RemoteResourceFetcher extends Context.Service<
               meters.map((meter) => [meter.polarId, meter.address]),
             ) as Record<string, MeterAddress>;
 
+            const benefits = yield* Effect.forEach(
+              remoteBenefits.filter(hasPaacMetadata),
+              (benefit) =>
+                decodeRemoteBenefitResource({ benefit, meterAddressesById }).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new RemoteResourceFetchError({
+                        message: `Failed to decode remote benefit: ${errorMessage(cause)}`,
+                      }),
+                  ),
+                ),
+              { concurrency: "unbounded" },
+            );
+
             const products = yield* Effect.forEach(
               remoteProducts.filter(hasPaacMetadata),
               (product) =>
@@ -452,11 +539,12 @@ export class RemoteResourceFetcher extends Context.Service<
             );
 
             const resources = new Map<ResourceAddress, CurrentResource>();
-            yield* Effect.forEach(
-              [...meters, ...products],
-              (resource) => putRemoteResource(resources, resource),
-              { discard: true },
-            );
+            for (const resource of [...meters, ...benefits, ...products]) {
+              if (resources.has(resource.address)) {
+                return yield* new DuplicateRemoteResourceAddress({ address: resource.address });
+              }
+              resources.set(resource.address, resource);
+            }
 
             return resources;
           }),
