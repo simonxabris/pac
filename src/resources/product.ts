@@ -7,7 +7,8 @@ import {
 } from "../currency//currency.js";
 import { makeAddress, type ResourceAddress } from "../core/address.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
-import { MeterAddressSchema, type MeterAddress } from "./meter.js";
+import { BenefitAddressSchema, type Benefit, type BenefitAddress } from "./benefit.js";
+import { MeterAddressSchema, type Meter, type MeterAddress } from "./meter.js";
 import { registerResource } from "./registry.js";
 
 export type ProductKind = "product";
@@ -33,9 +34,11 @@ export type CustomPriceConfig = {
   readonly presetAmount?: string | number | null;
 };
 
+export type MeterReference = MeterAddress | Pick<Meter, "address">;
+
 export type MeteredUnitPriceConfig = {
   readonly type: "meteredUnit";
-  readonly meter: string;
+  readonly meter: MeterReference;
   readonly amount: string | number;
   readonly currency: string;
   readonly capAmount?: string | number | null;
@@ -47,10 +50,13 @@ export type ProductPriceConfig =
   | CustomPriceConfig
   | MeteredUnitPriceConfig;
 
+export type BenefitReference = BenefitAddress | Pick<Benefit, "address">;
+
 export type ProductConfig = {
   readonly name: string;
   readonly description?: string | null;
   readonly prices: ReadonlyArray<ProductPriceConfig>;
+  readonly benefits?: ReadonlyArray<BenefitReference>;
   readonly visibility?: "draft" | "private" | "public";
   readonly recurringInterval?: "day" | "week" | "month" | "year" | null;
   readonly recurringIntervalCount?: number;
@@ -96,6 +102,7 @@ export type ProductSpec = {
   readonly name: string;
   readonly description: string | null;
   readonly prices: ReadonlyArray<ProductPriceSpec>;
+  readonly benefits: ReadonlyArray<BenefitAddress>;
   readonly visibility: "draft" | "private" | "public";
   readonly recurringInterval: "day" | "week" | "month" | "year" | null;
   readonly recurringIntervalCount: number | null;
@@ -105,6 +112,10 @@ export type CurrentProductProviderState = {
   readonly prices: ReadonlyArray<{
     readonly polarPriceId: string;
     readonly spec: ProductPriceSpec;
+  }>;
+  readonly benefits: ReadonlyArray<{
+    readonly polarBenefitId: string;
+    readonly address: BenefitAddress | null;
   }>;
 };
 
@@ -154,6 +165,7 @@ export const ProductSpecSchema = Schema.Struct({
   name: Schema.String,
   description: Schema.NullOr(Schema.String),
   prices: Schema.Array(ProductPriceSpecSchema),
+  benefits: Schema.Array(BenefitAddressSchema),
   visibility: Schema.Union([
     Schema.Literal("draft"),
     Schema.Literal("private"),
@@ -185,6 +197,12 @@ export const CurrentProductProviderStateSchema = Schema.Struct({
       spec: ProductPriceSpecSchema,
     }),
   ),
+  benefits: Schema.Array(
+    Schema.Struct({
+      polarBenefitId: Schema.String,
+      address: Schema.NullOr(BenefitAddressSchema),
+    }),
+  ),
 });
 
 export const CurrentProductResourceSchema = Schema.Struct({
@@ -193,7 +211,7 @@ export const CurrentProductResourceSchema = Schema.Struct({
   key: Schema.String,
   address: ProductAddressSchema,
   polarId: Schema.String,
-  isArchived: Schema.Boolean,
+  isRemoved: Schema.Boolean,
   spec: ProductSpecSchema,
   providerState: CurrentProductProviderStateSchema,
   raw: Schema.optionalKey(Schema.Unknown),
@@ -222,17 +240,47 @@ export const customPrice = (config: Omit<CustomPriceConfig, "type">): CustomPric
   ...(config.presetAmount !== undefined ? { presetAmount: config.presetAmount } : {}),
 });
 
-const meterReference = (meter: unknown): string => {
-  if (typeof meter === "string") return meter;
-  if (typeof meter === "object" && meter !== null && "address" in meter) {
-    const address = (meter as { readonly address: unknown }).address;
-    if (typeof address === "string") return address;
+const MeterReferenceSchema = Schema.Union([
+  MeterAddressSchema,
+  Schema.Struct({ address: MeterAddressSchema }),
+]);
+
+const BenefitReferenceSchema = Schema.Union([
+  BenefitAddressSchema,
+  Schema.Struct({ address: BenefitAddressSchema }),
+]);
+
+const decodeMeterReference = Schema.decodeUnknownSync(MeterReferenceSchema);
+const decodeBenefitReference = Schema.decodeUnknownSync(BenefitReferenceSchema);
+
+const meterReference = (meter: MeterReference): MeterAddress => {
+  const reference = decodeMeterReference(meter);
+  return typeof reference === "string" ? reference : reference.address;
+};
+
+const benefitReference = (benefit: BenefitReference): BenefitAddress => {
+  const reference = decodeBenefitReference(benefit);
+  return typeof reference === "string" ? reference : reference.address;
+};
+
+const normalizeBenefitReferences = (
+  benefits: ReadonlyArray<BenefitReference> | undefined,
+): ReadonlyArray<BenefitAddress> => {
+  const addresses = (benefits ?? []).map(benefitReference);
+  const seen = new Set<BenefitAddress>();
+
+  for (const address of addresses) {
+    if (seen.has(address)) {
+      throw new Error(`Product benefits contain duplicate reference '${address}'.`);
+    }
+    seen.add(address);
   }
-  return String(meter);
+
+  return addresses.sort();
 };
 
 export const meteredUnitPrice = (
-  config: Omit<MeteredUnitPriceConfig, "type" | "meter"> & { readonly meter: unknown },
+  config: Omit<MeteredUnitPriceConfig, "type">,
 ): MeteredUnitPriceConfig => ({
   type: "meteredUnit",
   meter: meterReference(config.meter),
@@ -285,6 +333,7 @@ export const productSpec = (config: ProductConfig): ProductSpec => {
     name: config.name,
     description: config.description ?? null,
     prices: config.prices.map(productPriceSpec),
+    benefits: normalizeBenefitReferences(config.benefits),
     visibility: config.visibility ?? "public",
     recurringInterval,
     recurringIntervalCount:

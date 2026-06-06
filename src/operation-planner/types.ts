@@ -1,11 +1,11 @@
 import type { ResourceAddress } from "../core/address.js";
-import type { ArchivePlanNode, CreatePlanNode, UpdatePlanNode } from "../planner.js";
+import type { CreatePlanNode, RemovePlanNode, UpdatePlanNode } from "../planner.js";
 import type { ResourceBindings } from "../operations/bindings.js";
 import type { Operation } from "../operations/operation.js";
 
 export type OperationId = string;
 
-export type ExecutablePlanNode = CreatePlanNode | UpdatePlanNode | ArchivePlanNode;
+export type ExecutablePlanNode = CreatePlanNode | UpdatePlanNode | RemovePlanNode;
 
 export type OperationGroup = {
   readonly address: ResourceAddress;

@@ -21,7 +21,7 @@ import {
 const isExecutablePlanNode = (
   node: PlanNodeMap extends ReadonlyMap<ResourceAddress, infer Node> ? Node : never,
 ): node is ExecutablePlanNode =>
-  node._tag === "Create" || node._tag === "Update" || node._tag === "Archive";
+  node._tag === "Create" || node._tag === "Update" || node._tag === "Remove";
 
 export const lowerPlanNodesToOperationGroups = (
   nodes: PlanNodeMap,
@@ -123,11 +123,11 @@ const buildOperationConstraints = (
     const toGroup = groupsByAddress.get(edge.to);
     if (fromGroup === undefined || toGroup === undefined) continue;
 
-    if (fromGroup.node._tag === "Archive") {
+    if (fromGroup.node._tag === "Remove") {
       addConstraint({
         before: fromGroup.lastOperationId,
         after: toGroup.firstOperationId,
-        reason: `${edge.from} must be archived before dependency ${edge.to}.`,
+        reason: `${edge.from} must be removed before dependency ${edge.to}.`,
       });
       continue;
     }

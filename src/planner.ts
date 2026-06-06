@@ -52,8 +52,11 @@ export type UpdatePlanNode = {
   readonly changes: ReadonlyArray<FieldChange>;
 };
 
-export type ArchivePlanNode = {
-  readonly _tag: "Archive";
+export type RemovalMode = "archive" | "delete";
+
+export type RemovePlanNode = {
+  readonly _tag: "Remove";
+  readonly mode: RemovalMode;
   readonly address: ResourceAddress;
   readonly kind: ResourceKind;
   readonly current: CurrentResource;
@@ -78,7 +81,7 @@ export type BlockedPlanNode = {
 export type PlanNode =
   | CreatePlanNode
   | UpdatePlanNode
-  | ArchivePlanNode
+  | RemovePlanNode
   | NoopPlanNode
   | BlockedPlanNode;
 
@@ -288,7 +291,7 @@ export class Planner extends Context.Service<
                     current: node.current,
                   });
                   return;
-                case "Archive":
+                case "Remove":
                   nodes.set(address, {
                     _tag: "Blocked",
                     address: node.address,
@@ -331,7 +334,7 @@ export class Planner extends Context.Service<
                 continue;
               }
 
-              if (currentResource.isArchived) {
+              if (currentResource.isRemoved) {
                 continue;
               }
 
@@ -343,7 +346,8 @@ export class Planner extends Context.Service<
               }
 
               nodes.set(address, {
-                _tag: "Archive",
+                _tag: "Remove",
+                mode: adapter.removalMode,
                 address,
                 kind: currentResource.kind,
                 current: currentResource,

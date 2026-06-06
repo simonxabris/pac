@@ -177,8 +177,10 @@ const renderNode = (node: PlanNode): string => {
       return [`  + ${node.address} (${node.kind})`, ...renderCreateFields(node)].join("\n");
     case "Update":
       return [`  ~ ${node.address} (${node.kind})`, ...renderUpdateChanges(node)].join("\n");
-    case "Archive":
-      return `  - ${node.address} (${node.kind})`;
+    case "Remove":
+      return node.mode === "delete"
+        ? `  ! ${node.address} (${node.kind})`
+        : `  - ${node.address} (${node.kind})`;
     case "Noop":
       return `  = ${node.address} (${node.kind})`;
     case "Blocked":
@@ -205,7 +207,8 @@ export class Renderer extends Context.Service<
           const nodes = [...plan.nodes.values()];
           const creates = nodes.filter((n) => n._tag === "Create");
           const updates = nodes.filter((n) => n._tag === "Update");
-          const archives = nodes.filter((n) => n._tag === "Archive");
+          const archives = nodes.filter((n) => n._tag === "Remove" && n.mode === "archive");
+          const deletes = nodes.filter((n) => n._tag === "Remove" && n.mode === "delete");
           const noops = nodes.filter((n) => n._tag === "Noop");
           const blocked = nodes.filter((n) => n._tag === "Blocked");
 
@@ -230,6 +233,14 @@ export class Renderer extends Context.Service<
           if (archives.length > 0) {
             yield* Console.log(`\nArchive (${archives.length}):`);
             for (const node of archives) {
+              yield* Console.log(renderNode(node));
+            }
+          }
+
+          if (deletes.length > 0) {
+            yield* Console.log(`\nDelete (${deletes.length}):`);
+            yield* Console.log("  WARNING: delete-mode removals are destructive and may revoke existing access or grants.");
+            for (const node of deletes) {
               yield* Console.log(renderNode(node));
             }
           }

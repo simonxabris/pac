@@ -120,6 +120,20 @@ export class Executor extends Context.Service<
           case "ArchiveMeter":
             return polar.archiveMeter(action.id);
 
+          case "CreateBenefit":
+            return polar.createBenefit(
+              action.payload as unknown as Parameters<typeof polar.createBenefit>[0],
+            );
+
+          case "UpdateBenefit":
+            return polar.updateBenefit(
+              action.id,
+              action.payload as Parameters<typeof polar.updateBenefit>[1],
+            );
+
+          case "DeleteBenefit":
+            return polar.deleteBenefit(action.id);
+
           case "CreateProduct":
             return polar.createProduct(
               action.payload as unknown as Parameters<typeof polar.createProduct>[0],
@@ -133,6 +147,9 @@ export class Executor extends Context.Service<
 
           case "ArchiveProduct":
             return polar.archiveProduct(action.id);
+
+          case "UpdateProductBenefits":
+            return polar.updateProductBenefits(action.id, action.payload.benefits);
         }
       };
 

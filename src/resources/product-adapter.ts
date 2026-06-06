@@ -4,56 +4,33 @@ import {
   polarDecimalMinorUnitAmount,
   polarIntegerMinorUnitNumber,
 } from "../currency/currency.js";
-import type { OperationAction } from "../operations/actions.js";
-import type { Operation, RollbackAction } from "../operations/operation.js";
+import type { Operation } from "../operations/operation.js";
 import type {
+  ProductBenefitsUpdateOperationPayload,
   ProductCreateOperationPayload,
   ProductPriceCreatePayload,
   ProductUpdateOperationPayload,
   ProductUpdatePricePayload,
 } from "../operations/payloads/product.js";
-import type { OperationRef } from "../operations/ref.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
 import type {
   CreateOperationsFromPlanContext,
   ResourceAdapter,
   ResourceExecutablePlanNode,
 } from "../resource-adapter-registry.js";
+import {
+  managedMetadata,
+  polarIdRef,
+  pushFieldChange,
+  unsupportedRollback,
+  valuesEqual,
+} from "./adapter-utils.js";
 import type {
   CurrentProductProviderState,
   ProductKind,
   ProductPriceSpec,
   ProductSpec,
 } from "./product.js";
-
-const valuesEqual = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
-const fieldChange = (
-  path: ReadonlyArray<string | number>,
-  before: unknown,
-  after: unknown,
-): FieldChange | undefined =>
-  valuesEqual(before, after)
-    ? undefined
-    : {
-      _tag: "FieldChange",
-      path,
-      before,
-      after,
-    };
-
-const pushFieldChange = (
-  changes: Array<FieldChange>,
-  path: ReadonlyArray<string | number>,
-  before: unknown,
-  after: unknown,
-): void => {
-  const change = fieldChange(path, before, after);
-  if (change !== undefined) {
-    changes.push(change);
-  }
-};
 
 type ProductPriceField =
   | "type"
@@ -115,26 +92,6 @@ const diffProductPrices = (
     }
   }
 };
-
-const polarIdRef = (address: OperationRef["address"]): OperationRef => ({
-  _tag: "Ref",
-  address,
-  field: "polarId",
-});
-
-const unsupportedRollback = (reason: string): RollbackAction => ({
-  _tag: "UnsupportedRollback",
-  reason,
-});
-
-const managedMetadata = (kind: ProductKind, address: OperationRef["address"], key: string) => ({
-  paac: JSON.stringify({
-    v: 1,
-    kind,
-    addr: address,
-    key,
-  }),
-});
 
 const productPriceCreatePayload = (price: ProductPriceSpec): ProductPriceCreatePayload => {
   switch (price.type) {
@@ -214,6 +171,18 @@ const productPriceUpdatePayloads = (
     return productPriceCreatePayload(price);
   });
 
+const productBenefitsUpdatePayload = (
+  benefits: ReadonlyArray<ProductSpec["benefits"][number]>,
+): ProductBenefitsUpdateOperationPayload => ({
+  benefits: benefits.map((benefit) => polarIdRef(benefit)),
+});
+
+const currentProductBenefitsUpdatePayload = (
+  providerState: CurrentProductProviderState,
+): ProductBenefitsUpdateOperationPayload => ({
+  benefits: providerState.benefits.map((benefit) => benefit.polarBenefitId),
+});
+
 const productUpdatePayload = (
   spec: ProductSpec,
   changes: ReadonlyArray<FieldChange>,
@@ -240,85 +209,164 @@ const productUpdatePayload = (
   return payload;
 };
 
+const hasOrdinaryProductChanges = (changes: ReadonlyArray<FieldChange>): boolean =>
+  changes.some((change) => change.path[0] !== "benefits");
+
+const hasBenefitChanges = (changes: ReadonlyArray<FieldChange>): boolean =>
+  changes.some((change) => change.path[0] === "benefits");
+
 const createProductOperationFromPlanNode = (
   node: ResourceExecutablePlanNode<ProductKind, ProductSpec>,
   context: CreateOperationsFromPlanContext,
-): Operation => {
-  const id = context.nextOperationId();
-
+): ReadonlyArray<Operation> => {
   switch (node._tag) {
-    case "Create":
-      return {
-        _tag: "Operation",
-        id,
-        address: node.address,
-        kind: "product",
-        action: {
-          _tag: "CreateProduct",
-          payload: productCreatePayload(node),
-        },
-        rollback: {
-          _tag: "RollbackOperation",
+    case "Create": {
+      const createProductOperationId = context.nextOperationId();
+      const operations: Array<Operation> = [
+        {
+          _tag: "Operation",
+          id: createProductOperationId,
+          address: node.address,
+          kind: "product",
           action: {
-            _tag: "ArchiveProduct",
-            id: polarIdRef(node.address),
-            payload: { isArchived: true },
+            _tag: "CreateProduct",
+            payload: productCreatePayload(node),
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "ArchiveProduct",
+              id: polarIdRef(node.address),
+              payload: { isArchived: true },
+            },
           },
         },
-      };
+      ];
+
+      if (node.desired.spec.benefits.length > 0) {
+        operations.push({
+          _tag: "Operation",
+          id: context.nextOperationId(),
+          address: node.address,
+          kind: "product",
+          action: {
+            _tag: "UpdateProductBenefits",
+            id: polarIdRef(node.address),
+            payload: productBenefitsUpdatePayload(node.desired.spec.benefits),
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProductBenefits",
+              id: polarIdRef(node.address),
+              payload: { benefits: [] },
+            },
+          },
+        });
+      }
+
+      return operations;
+    }
     case "Update": {
       const providerState = node.current.providerState as CurrentProductProviderState;
-      const action: OperationAction = {
-        _tag: "UpdateProduct",
-        id: node.current.polarId,
-        payload: productUpdatePayload(node.desired.spec, node.changes, providerState),
-      };
+      const operations: Array<Operation> = [];
 
-      return {
-        _tag: "Operation",
-        id,
-        address: node.address,
-        kind: "product",
-        action,
-        rollback: {
-          _tag: "RollbackOperation",
+      if (hasOrdinaryProductChanges(node.changes)) {
+        operations.push({
+          _tag: "Operation",
+          id: context.nextOperationId(),
+          address: node.address,
+          kind: "product",
           action: {
             _tag: "UpdateProduct",
             id: node.current.polarId,
-            payload: productUpdatePayload(node.current.spec, node.changes, providerState),
+            payload: productUpdatePayload(node.desired.spec, node.changes, providerState),
           },
-        },
-      };
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProduct",
+              id: node.current.polarId,
+              payload: productUpdatePayload(node.current.spec, node.changes, providerState),
+            },
+          },
+        });
+      }
+
+      if (hasBenefitChanges(node.changes)) {
+        operations.push({
+          _tag: "Operation",
+          id: context.nextOperationId(),
+          address: node.address,
+          kind: "product",
+          action: {
+            _tag: "UpdateProductBenefits",
+            id: node.current.polarId,
+            payload: productBenefitsUpdatePayload(node.desired.spec.benefits),
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProductBenefits",
+              id: node.current.polarId,
+              payload: currentProductBenefitsUpdatePayload(providerState),
+            },
+          },
+        });
+      }
+
+      return operations;
     }
-    case "Archive":
-      return {
-        _tag: "Operation",
-        id,
-        address: node.address,
-        kind: "product",
-        action: {
-          _tag: "ArchiveProduct",
-          id: node.current.polarId,
-          payload: { isArchived: true },
+    case "Remove":
+      return [
+        {
+          _tag: "Operation",
+          id: context.nextOperationId(),
+          address: node.address,
+          kind: "product",
+          action: {
+            _tag: "ArchiveProduct",
+            id: node.current.polarId,
+            payload: { isArchived: true },
+          },
+          rollback: unsupportedRollback("Archive rollback is not implemented yet."),
         },
-        rollback: unsupportedRollback("Archive rollback is not implemented yet."),
-      };
+      ];
   }
 };
 
 export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> = {
   kind: "product",
+  removalMode: "archive",
 
   dependencies: (desired) =>
     Effect.succeed([
-      ...new Set(
-        desired.spec.prices.flatMap((price) => (price.type === "meteredUnit" ? [price.meter] : [])),
-      ),
+      ...new Set([
+        ...desired.spec.prices.flatMap((price) =>
+          price.type === "meteredUnit" ? [price.meter] : []
+        ),
+        ...desired.spec.benefits,
+      ]),
     ]),
 
   diff: (desired, current) =>
     Effect.sync(() => {
       const diagnostics: Array<Diagnostic> = [];
+
+      const unmanagedBenefitIds = (current.providerState as CurrentProductProviderState).benefits
+        .filter((benefit) => benefit.address === null)
+        .map((benefit) => benefit.polarBenefitId);
+
+      if (unmanagedBenefitIds.length > 0) {
+        diagnostics.push({
+          _tag: "Diagnostic",
+          severity: "error",
+          code: "product.benefits.unmanaged",
+          address: desired.address,
+          path: ["benefits"],
+          message: `Product has unmanaged Polar Benefit attachments: ${unmanagedBenefitIds.join(", ")}.`,
+        });
+      }
 
       if (desired.spec.recurringInterval !== current.spec.recurringInterval) {
         diagnostics.push({
@@ -362,6 +410,7 @@ export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> =
       pushFieldChange(changes, ["description"], current.spec.description, desired.spec.description);
       pushFieldChange(changes, ["visibility"], current.spec.visibility, desired.spec.visibility);
       diffProductPrices(changes, current.spec.prices, desired.spec.prices);
+      pushFieldChange(changes, ["benefits"], current.spec.benefits, desired.spec.benefits);
 
       if (changes.length === 0) {
         return {
@@ -392,5 +441,5 @@ export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> =
     }),
 
   createOperationsFromPlan: (node, context) =>
-    Effect.succeed([createProductOperationFromPlanNode(node, context)]),
+    Effect.succeed(createProductOperationFromPlanNode(node, context)),
 };

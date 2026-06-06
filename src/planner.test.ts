@@ -239,7 +239,7 @@ describe("Planner.plan", () => {
         key: desired.key,
         address: desired.address,
         polarId: "polar-meter-requests",
-        isArchived: false,
+        isRemoved: false,
         spec: desired.spec,
       };
       const planner = yield* Planner;
@@ -319,7 +319,7 @@ describe("Planner.plan", () => {
         key: meter.key,
         address: meter.address,
         polarId: "polar-meter-requests",
-        isArchived: false,
+        isRemoved: false,
         spec: meter.spec,
       };
       const planner = yield* Planner;
@@ -342,7 +342,8 @@ describe("Planner.plan", () => {
         [
           "meter.requests",
           {
-            _tag: "Archive",
+            _tag: "Remove",
+            mode: "archive",
             address: "meter.requests",
             kind: "meter",
             current: currentMeter,
@@ -445,7 +446,8 @@ describe("Planner.plan", () => {
         [
           "product.pro",
           {
-            _tag: "Archive",
+            _tag: "Remove",
+            mode: "archive",
             address: "product.pro",
             kind: "product",
             current: currentProduct,
@@ -465,7 +467,7 @@ describe("Planner.plan", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
-  it.effect("plans an archive node for a managed current resource absent from desired", () =>
+  it.effect("plans a remove node for a managed current resource absent from desired", () =>
     Effect.gen(function*() {
       const desiredShape = new Product("legacy", {
         name: "Legacy",
@@ -486,7 +488,8 @@ describe("Planner.plan", () => {
         [
           "product.legacy",
           {
-            _tag: "Archive",
+            _tag: "Remove",
+            mode: "archive",
             address: "product.legacy",
             kind: "product",
             current,
@@ -497,7 +500,7 @@ describe("Planner.plan", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
-  it.effect("ignores archived current resources absent from desired", () =>
+  it.effect("ignores removed current resources absent from desired", () =>
     Effect.gen(function*() {
       const product = new Product("pro", {
         name: "Pro",
@@ -508,20 +511,20 @@ describe("Planner.plan", () => {
         filter: { conjunction: "and", clauses: [] },
         aggregation: count(),
       }).toDesiredResource();
-      const archivedCurrentMeter: CurrentMeterResource = {
+      const removedCurrentMeter: CurrentMeterResource = {
         source: "current",
         kind: "meter",
         key: meter.key,
         address: meter.address,
         polarId: "polar-meter-requests",
-        isArchived: true,
+        isRemoved: true,
         spec: meter.spec,
       };
       const planner = yield* Planner;
 
       const plan = yield* planner.plan({
         desiredResources: [product],
-        currentResources: [archivedCurrentMeter],
+        currentResources: [removedCurrentMeter],
       });
 
       expect([...plan.nodes.entries()]).toEqual([
@@ -536,12 +539,12 @@ describe("Planner.plan", () => {
         ],
       ]);
       expect(plan.nodes.has("meter.requests")).toBe(false);
-      expect([...plan.nodes.values()].some((node) => node._tag === "Archive")).toBe(false);
+      expect([...plan.nodes.values()].some((node) => node._tag === "Remove")).toBe(false);
       expect(plan.edges).toEqual([]);
     }).pipe(Effect.provide(testLayer)),
   );
 
-  it.effect("captures dependencies from current resources for archive ordering", () =>
+  it.effect("captures dependencies from current resources for remove ordering", () =>
     Effect.gen(function*() {
       const meter = new Meter("requests", {
         name: "Requests",
@@ -558,7 +561,7 @@ describe("Planner.plan", () => {
         key: meter.key,
         address: meter.address,
         polarId: "polar-meter-requests",
-        isArchived: false,
+        isRemoved: false,
         spec: meter.spec,
       };
       const currentProduct: CurrentProductResource = currentProductResource({

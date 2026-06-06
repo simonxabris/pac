@@ -12,6 +12,11 @@ import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "
 import type { CurrentResource } from "./core/resource.js";
 import { PolarClient } from "./polar/service.js";
 import {
+  CurrentBenefitResourceSchema,
+  type BenefitAddress,
+  type CurrentBenefitResource,
+} from "./resources/benefit.js";
+import {
   CurrentMeterResourceSchema,
   MeterAddressSchema,
   MeterAggregationSpecSchema,
@@ -88,6 +93,10 @@ const RemoteProductPrice = Schema.Union([
 
 type RemoteProductPrice = typeof RemoteProductPrice.Type;
 
+const RemoteProductBenefit = Schema.Struct({
+  id: Schema.String,
+});
+
 const RemoteProductSdk = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -109,10 +118,30 @@ const RemoteProductSdk = Schema.Struct({
   isArchived: Schema.Boolean,
   metadata: MetadataRecord,
   prices: Schema.Array(RemoteProductPrice),
+  benefits: Schema.Array(RemoteProductBenefit),
 });
 
 const RemoteProductResourceInput = Schema.Struct({
   product: RemoteProductSdk,
+  meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
+  benefitAddressesById: Schema.Record(Schema.String, Schema.TemplateLiteral(["benefit.", Schema.String])),
+});
+
+const RemoteBenefitMeterCreditSdk = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("meter_credit"),
+  description: Schema.String,
+  isDeleted: Schema.Boolean,
+  metadata: MetadataRecord,
+  properties: Schema.Struct({
+    units: Schema.Number,
+    rollover: Schema.Boolean,
+    meterId: Schema.String,
+  }),
+});
+
+const RemoteBenefitResourceInput = Schema.Struct({
+  benefit: RemoteBenefitMeterCreditSdk,
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
 });
 
@@ -161,7 +190,7 @@ const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIden
 };
 
 const identityForKind = (
-  kind: "product" | "meter",
+  kind: "product" | "meter" | "benefit",
   metadata: typeof MetadataRecord.Type,
 ): ManagedIdentity => {
   const identity = parseManagedIdentity(metadata);
@@ -218,10 +247,20 @@ const productPriceToSpec = (
 const productToCurrentResource = ({
   product,
   meterAddressesById,
+  benefitAddressesById,
 }: typeof RemoteProductResourceInput.Type): CurrentProductResource => {
   const identity = identityForKind("product", product.metadata);
   const activePrices = product.prices.filter((price) => !price.isArchived);
   const prices = activePrices.map((price) => productPriceToSpec(price, meterAddressesById));
+  const attachedBenefits = product.benefits.map((benefit) => ({
+    polarBenefitId: benefit.id,
+    address: benefitAddressesById[benefit.id] ?? null,
+  }));
+  const benefits = [
+    ...new Set(
+      attachedBenefits.flatMap((benefit) => benefit.address === null ? [] : [benefit.address]),
+    ),
+  ].sort() as ReadonlyArray<BenefitAddress>;
 
   return {
     source: "current",
@@ -229,11 +268,12 @@ const productToCurrentResource = ({
     key: identity.key,
     address: identity.address as `product.${string}`,
     polarId: product.id,
-    isArchived: product.isArchived,
+    isRemoved: product.isArchived,
     spec: {
       name: product.name,
       description: product.description,
       prices,
+      benefits,
       visibility: product.visibility,
       recurringInterval: product.recurringInterval,
       recurringIntervalCount:
@@ -244,6 +284,7 @@ const productToCurrentResource = ({
         polarPriceId: price.id,
         spec: prices[index] as ProductPriceSpec,
       })),
+      benefits: attachedBenefits,
     },
     raw: product,
   };
@@ -259,8 +300,11 @@ const productResourceToRemoteInput = (
     visibility: resource.spec.visibility,
     recurringInterval: resource.spec.recurringInterval,
     recurringIntervalCount: resource.spec.recurringIntervalCount,
-    isArchived: resource.isArchived,
+    isArchived: resource.isRemoved,
     metadata: {},
+    benefits: resource.providerState.benefits.map((benefit) => ({
+      id: benefit.polarBenefitId,
+    })),
     prices: resource.spec.prices.map((price, index) => {
       const providerPrice = resource.providerState.prices[index];
       if (providerPrice === undefined) {
@@ -302,6 +346,55 @@ const productResourceToRemoteInput = (
     }),
   },
   meterAddressesById: {},
+  benefitAddressesById: {},
+});
+
+const benefitToCurrentResource = ({
+  benefit,
+  meterAddressesById,
+}: typeof RemoteBenefitResourceInput.Type): CurrentBenefitResource => {
+  const identity = identityForKind("benefit", benefit.metadata);
+  const meterAddress = meterAddressesById[benefit.properties.meterId];
+  if (meterAddress === undefined) {
+    throw new Error(
+      `Meter-credit benefit references unmanaged or unknown meter '${benefit.properties.meterId}'.`,
+    );
+  }
+
+  return {
+    source: "current",
+    kind: "benefit",
+    key: identity.key,
+    address: identity.address as `benefit.${string}`,
+    polarId: benefit.id,
+    isRemoved: benefit.isDeleted,
+    spec: {
+      type: "meter-credit",
+      description: benefit.description,
+      meter: meterAddress,
+      units: benefit.properties.units,
+      rollover: benefit.properties.rollover,
+    },
+    raw: benefit,
+  };
+};
+
+const benefitResourceToRemoteInput = (
+  resource: CurrentBenefitResource,
+): typeof RemoteBenefitResourceInput.Type => ({
+  benefit: {
+    id: resource.polarId,
+    type: "meter_credit",
+    description: resource.spec.description,
+    isDeleted: resource.isRemoved,
+    metadata: {},
+    properties: {
+      units: resource.spec.units,
+      rollover: resource.spec.rollover,
+      meterId: resource.spec.meter,
+    },
+  },
+  meterAddressesById: {},
 });
 
 const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeterResource => {
@@ -312,7 +405,7 @@ const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeter
     key: identity.key,
     address: identity.address as `meter.${string}`,
     polarId: meter.id,
-    isArchived: meter.archivedAt != null,
+    isRemoved: meter.archivedAt != null,
     spec: {
       name: meter.name,
       unit: meter.unit,
@@ -335,6 +428,19 @@ const meterResourceToRemote = (resource: CurrentMeterResource): typeof RemoteMet
   aggregation: resource.spec.aggregation,
   metadata: {},
 });
+
+export const RemoteBenefitResourceSchema = RemoteBenefitResourceInput.pipe(
+  Schema.decodeTo(CurrentBenefitResourceSchema, {
+    decode: SchemaGetter.transformOrFail((input) =>
+      Effect.try({
+        try: () => benefitToCurrentResource(input),
+        catch: (cause) =>
+          schemaIssue(input, cause instanceof Error ? cause.message : String(cause)),
+      }),
+    ),
+    encode: SchemaGetter.transform(benefitResourceToRemoteInput),
+  }),
+);
 
 export const RemoteProductResourceSchema = RemoteProductResourceInput.pipe(
   Schema.decodeTo(CurrentProductResourceSchema, {
@@ -362,6 +468,7 @@ export const RemoteMeterResourceSchema = RemoteMeterSdk.pipe(
   }),
 );
 
+export const decodeRemoteBenefitResource = Schema.decodeUnknownEffect(RemoteBenefitResourceSchema);
 export const decodeRemoteProductResource = Schema.decodeUnknownEffect(RemoteProductResourceSchema);
 export const decodeRemoteMeterResource = Schema.decodeUnknownEffect(RemoteMeterResourceSchema);
 
@@ -378,17 +485,6 @@ export class DuplicateRemoteResourceAddress extends Schema.TaggedErrorClass<Dupl
     address: ResourceAddressSchema,
   },
 ) { }
-
-const putRemoteResource = (
-  map: Map<ResourceAddress, CurrentResource>,
-  resource: CurrentResource,
-): Effect.Effect<void, DuplicateRemoteResourceAddress> => {
-  if (map.has(resource.address)) {
-    return Effect.fail(new DuplicateRemoteResourceAddress({ address: resource.address }));
-  }
-  map.set(resource.address, resource);
-  return Effect.void;
-};
 
 export class RemoteResourceFetcher extends Context.Service<
   RemoteResourceFetcher,
@@ -407,8 +503,8 @@ export class RemoteResourceFetcher extends Context.Service<
       return RemoteResourceFetcher.of({
         fetch: () =>
           Effect.gen(function*() {
-            const [remoteProducts, remoteMeters] = yield* Effect.all(
-              [polar.listProducts(), polar.listMeters()] as const,
+            const [remoteProducts, remoteMeters, remoteBenefits] = yield* Effect.all(
+              [polar.listProducts(), polar.listMeters(), polar.listBenefits()] as const,
               { concurrency: "unbounded" },
             ).pipe(
               Effect.mapError(
@@ -437,10 +533,28 @@ export class RemoteResourceFetcher extends Context.Service<
               meters.map((meter) => [meter.polarId, meter.address]),
             ) as Record<string, MeterAddress>;
 
+            const benefits = yield* Effect.forEach(
+              remoteBenefits.filter(hasPaacMetadata),
+              (benefit) =>
+                decodeRemoteBenefitResource({ benefit, meterAddressesById }).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new RemoteResourceFetchError({
+                        message: `Failed to decode remote benefit: ${errorMessage(cause)}`,
+                      }),
+                  ),
+                ),
+              { concurrency: "unbounded" },
+            );
+
+            const benefitAddressesById = Object.fromEntries(
+              benefits.map((benefit) => [benefit.polarId, benefit.address]),
+            ) as Record<string, BenefitAddress>;
+
             const products = yield* Effect.forEach(
               remoteProducts.filter(hasPaacMetadata),
               (product) =>
-                decodeRemoteProductResource({ product, meterAddressesById }).pipe(
+                decodeRemoteProductResource({ product, meterAddressesById, benefitAddressesById }).pipe(
                   Effect.mapError(
                     (cause) =>
                       new RemoteResourceFetchError({
@@ -452,11 +566,12 @@ export class RemoteResourceFetcher extends Context.Service<
             );
 
             const resources = new Map<ResourceAddress, CurrentResource>();
-            yield* Effect.forEach(
-              [...meters, ...products],
-              (resource) => putRemoteResource(resources, resource),
-              { discard: true },
-            );
+            for (const resource of [...meters, ...benefits, ...products]) {
+              if (resources.has(resource.address)) {
+                return yield* new DuplicateRemoteResourceAddress({ address: resource.address });
+              }
+              resources.set(resource.address, resource);
+            }
 
             return resources;
           }),

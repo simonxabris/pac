@@ -10,6 +10,7 @@ import * as Flag from "effect/unstable/cli/Flag";
 import * as Effect from "effect/Effect";
 import { AppConfig } from "./config/service.js";
 import type { DesiredResource } from "./core/resource.js";
+import { assertDeleteModeRemovalsAllowed } from "./deletion-safety.js";
 import { Executor } from "./executor.js";
 import { OperationPlanner } from "./operation-planner.js";
 import { Planner } from "./planner.js";
@@ -67,6 +68,10 @@ const configFlag = Flag.string("config").pipe(
   Flag.withDescription("Path to the PAAC config file to load"),
 );
 
+const allowDeleteFlag = Flag.boolean("allow-delete").pipe(
+  Flag.withDescription("Allow destructive delete-mode removals during deploy"),
+);
+
 const plan = Command.make("plan", { config: configFlag }, ({ config }) =>
   Effect.gen(function*() {
     const desiredResources = yield* loadDesiredResources(config);
@@ -84,26 +89,30 @@ const plan = Command.make("plan", { config: configFlag }, ({ config }) =>
   }),
 ).pipe(Command.withDescription("Preview Polar resource changes"));
 
-const deploy = Command.make("deploy", { config: configFlag }, ({ config }) =>
-  Effect.gen(function*() {
-    const desiredResources = yield* loadDesiredResources(config);
-    const remoteResourceFetcher = yield* RemoteResourceFetcher;
-    const planner = yield* Planner;
-    const renderer = yield* Renderer;
-    const operationPlanner = yield* OperationPlanner;
-    const executor = yield* Executor;
+const deploy = Command.make(
+  "deploy",
+  { config: configFlag, allowDelete: allowDeleteFlag },
+  ({ config, allowDelete }) =>
+    Effect.gen(function*() {
+      const desiredResources = yield* loadDesiredResources(config);
+      const remoteResourceFetcher = yield* RemoteResourceFetcher;
+      const planner = yield* Planner;
+      const renderer = yield* Renderer;
+      const operationPlanner = yield* OperationPlanner;
+      const executor = yield* Executor;
 
-    const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
-    const plan = yield* planner.plan({
-      desiredResources,
-      currentResources: [...currentResourcesByAddress.values()],
-    });
+      const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
+      const plan = yield* planner.plan({
+        desiredResources,
+        currentResources: [...currentResourcesByAddress.values()],
+      });
 
-    yield* renderer.render(plan);
+      yield* renderer.render(plan);
+      yield* assertDeleteModeRemovalsAllowed(plan, allowDelete);
 
-    const program = yield* operationPlanner.create(plan);
-    yield* executor.execute(program);
-  }),
+      const program = yield* operationPlanner.create(plan);
+      yield* executor.execute(program);
+    }),
 ).pipe(Command.withDescription("Apply Polar resource changes"));
 
 const cli = Command.make("paac").pipe(
