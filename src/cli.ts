@@ -6,6 +6,7 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Layer, Schema } from "effect";
 import * as Command from "effect/unstable/cli/Command";
+import * as Flag from "effect/unstable/cli/Flag";
 import * as Effect from "effect/Effect";
 import { AppConfig } from "./config/service.js";
 import type { DesiredResource } from "./core/resource.js";
@@ -61,9 +62,14 @@ const CliLive = Layer.mergeAll(
   Renderer.layer,
 );
 
-const plan = Command.make("plan", {}, () =>
+const configFlag = Flag.string("config").pipe(
+  Flag.withDefault("paac.config.ts"),
+  Flag.withDescription("Path to the PAAC config file to load"),
+);
+
+const plan = Command.make("plan", { config: configFlag }, ({ config }) =>
   Effect.gen(function*() {
-    const desiredResources = yield* loadDesiredResources();
+    const desiredResources = yield* loadDesiredResources(config);
     const remoteResourceFetcher = yield* RemoteResourceFetcher;
     const planner = yield* Planner;
     const renderer = yield* Renderer;
@@ -78,9 +84,9 @@ const plan = Command.make("plan", {}, () =>
   }),
 ).pipe(Command.withDescription("Preview Polar resource changes"));
 
-const deploy = Command.make("deploy", {}, () =>
+const deploy = Command.make("deploy", { config: configFlag }, ({ config }) =>
   Effect.gen(function*() {
-    const desiredResources = yield* loadDesiredResources();
+    const desiredResources = yield* loadDesiredResources(config);
     const remoteResourceFetcher = yield* RemoteResourceFetcher;
     const planner = yield* Planner;
     const renderer = yield* Renderer;
