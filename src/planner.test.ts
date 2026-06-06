@@ -177,6 +177,55 @@ describe("Planner.plan", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
+  it.effect("blocks an existing product when recurringIntervalCount changes", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "2000", currency: "usd" })],
+        recurringInterval: "month",
+        recurringIntervalCount: 2,
+      }).toDesiredResource();
+      const current: CurrentProductResource = currentProductResource({
+        desired,
+        polarId: "polar-product-pro",
+        spec: {
+          ...desired.spec,
+          recurringIntervalCount: 1,
+        },
+      });
+      const planner = yield* Planner;
+
+      const plan = yield* planner.plan({
+        desiredResources: [desired],
+        currentResources: [current],
+      });
+
+      expect([...plan.nodes.entries()]).toEqual([
+        [
+          "product.pro",
+          {
+            _tag: "Blocked",
+            address: "product.pro",
+            kind: "product",
+            desired,
+            current,
+          },
+        ],
+      ]);
+      expect(plan.edges).toEqual([]);
+      expect(plan.diagnostics).toEqual([
+        {
+          _tag: "Diagnostic",
+          severity: "error",
+          code: "product.recurringIntervalCount.immutable",
+          address: "product.pro",
+          path: ["recurringIntervalCount"],
+          message: "Product recurringIntervalCount cannot be changed after creation.",
+        },
+      ]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
   it.effect("plans a noop node when desired and current specs match", () =>
     Effect.gen(function*() {
       const desired = new Meter("requests", {

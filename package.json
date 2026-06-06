@@ -21,6 +21,11 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=html",
+    "test:e2e": "pnpm build && node --env-file=.env.daytona ./node_modules/vitest/vitest.mjs run -c vitest.e2e.config.ts",
+    "test:e2e:reuse": "PAAC_E2E_REUSE_SANDBOX=1 pnpm test:e2e",
+    "polar:e2e:snapshot": "node --env-file=.env.daytona --import tsx scripts/polar-daytona-create-snapshot.ts --write-config",
+    "polar:e2e:up": "node --env-file=.env.daytona --import tsx scripts/polar-daytona-up.ts",
     "lint": "oxlint -c .oxlintrc.ts",
     "format": "oxfmt -c .oxfmtrc.ts --write .",
     "typecheck": "tsgo --noEmit"
@@ -28,9 +33,11 @@
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.76",
     "@polar-sh/sdk": "^0.47.1",
+    "@vitest/coverage-v8": "^4.1.8",
     "effect": "4.0.0-beta.76"
   },
   "devDependencies": {
+    "@daytona/sdk": "^0.184.0",
     "@effect/language-service": "^0.86.2",
     "@effect/vitest": "4.0.0-beta.78",
     "@types/node": "^25.9.1",
