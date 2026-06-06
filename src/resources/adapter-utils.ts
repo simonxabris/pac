@@ -1,10 +1,10 @@
+import { Equal } from "effect";
 import type { ResourceKind } from "../core/kind.js";
 import type { RollbackAction } from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
 import type { FieldChange } from "../planner.js";
 
-export const valuesEqual = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
+export const valuesEqual = (left: unknown, right: unknown): boolean => Equal.equals(left, right);
 
 export const fieldChange = (
   path: ReadonlyArray<string | number>,

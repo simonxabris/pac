@@ -1,9 +1,12 @@
 import { Effect } from "effect";
+import type { ResourceAddress } from "../core/address.js";
 import type { OperationAction } from "../operations/actions.js";
 import type { Operation } from "../operations/operation.js";
 import type {
   BenefitCreateOperationPayload,
+  BenefitCustomUpdateOperationPayload,
   BenefitMeterCreditPropertiesOperationPayload,
+  BenefitMeterCreditUpdateOperationPayload,
   BenefitUpdateOperationPayload,
 } from "../operations/payloads/benefit.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
@@ -20,9 +23,11 @@ import {
 } from "./adapter-utils.js";
 import type { BenefitKind, BenefitMeterCreditSpec, BenefitSpec } from "./benefit.js";
 
-const benefitSpecType = (spec: BenefitSpec): string => spec.type;
+const assertNever = (value: never): never => {
+  throw new Error(`Unexpected Benefit spec variant: ${JSON.stringify(value)}`);
+};
 
-const benefitDependencies = (spec: BenefitSpec): ReadonlyArray<BenefitMeterCreditSpec["meter"]> => {
+const benefitDependencies = (spec: BenefitSpec): ReadonlyArray<ResourceAddress> => {
   switch (spec.type) {
     case "meter-credit":
       return [spec.meter];
@@ -75,7 +80,7 @@ const benefitUpdatePayload = (
 ): BenefitUpdateOperationPayload => {
   switch (spec.type) {
     case "meter-credit": {
-      const payload: BenefitUpdateOperationPayload = { type: "meter_credit" };
+      const payload: BenefitMeterCreditUpdateOperationPayload = { type: "meter_credit" };
 
       if (hasChanged(changes, "description")) {
         payload.description = spec.description;
@@ -88,7 +93,7 @@ const benefitUpdatePayload = (
       return payload;
     }
     case "custom": {
-      const payload: BenefitUpdateOperationPayload = { type: "custom" };
+      const payload: BenefitCustomUpdateOperationPayload = { type: "custom" };
 
       if (hasChanged(changes, "description")) {
         payload.description = spec.description;
@@ -174,7 +179,7 @@ export const BenefitResourceAdapter: ResourceAdapter<BenefitKind, BenefitSpec> =
 
   diff: (desired, current) =>
     Effect.sync(() => {
-      if (benefitSpecType(desired.spec) !== benefitSpecType(current.spec)) {
+      if (desired.spec.type !== current.spec.type) {
         const diagnostics: Array<Diagnostic> = [
           {
             _tag: "Diagnostic",
@@ -203,14 +208,27 @@ export const BenefitResourceAdapter: ResourceAdapter<BenefitKind, BenefitSpec> =
 
       pushFieldChange(changes, ["description"], current.spec.description, desired.spec.description);
 
-      if (desired.spec.type === "meter-credit" && current.spec.type === "meter-credit") {
-        pushFieldChange(changes, ["meter"], current.spec.meter, desired.spec.meter);
-        pushFieldChange(changes, ["units"], current.spec.units, desired.spec.units);
-        pushFieldChange(changes, ["rollover"], current.spec.rollover, desired.spec.rollover);
-      }
+      switch (desired.spec.type) {
+        case "meter-credit": {
+          if (current.spec.type !== "meter-credit") {
+            throw new Error("Benefit type mismatch after immutable-type check.");
+          }
 
-      if (desired.spec.type === "custom" && current.spec.type === "custom") {
-        pushFieldChange(changes, ["note"], current.spec.note, desired.spec.note);
+          pushFieldChange(changes, ["meter"], current.spec.meter, desired.spec.meter);
+          pushFieldChange(changes, ["units"], current.spec.units, desired.spec.units);
+          pushFieldChange(changes, ["rollover"], current.spec.rollover, desired.spec.rollover);
+          break;
+        }
+        case "custom": {
+          if (current.spec.type !== "custom") {
+            throw new Error("Benefit type mismatch after immutable-type check.");
+          }
+
+          pushFieldChange(changes, ["note"], current.spec.note, desired.spec.note);
+          break;
+        }
+        default:
+          assertNever(desired.spec);
       }
 
       if (changes.length === 0) {

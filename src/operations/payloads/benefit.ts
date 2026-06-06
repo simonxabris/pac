@@ -28,6 +28,8 @@ export type BenefitMeterCreditUpdateOperationPayload = Omit<BenefitMeterCreditUp
   properties?: BenefitMeterCreditPropertiesOperationPayload | null | undefined;
 };
 
+export type BenefitCustomUpdateOperationPayload = BenefitCustomUpdate;
+
 export type BenefitUpdateOperationPayload =
   | BenefitMeterCreditUpdateOperationPayload
-  | BenefitCustomUpdate;
+  | BenefitCustomUpdateOperationPayload;
