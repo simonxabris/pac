@@ -8,6 +8,21 @@ export type {
 } from "./core/resource.js";
 
 export {
+  Benefit,
+  benefitSpec,
+} from "./resources/benefit.js";
+export type {
+  BenefitAddress,
+  BenefitConfig,
+  BenefitKind,
+  BenefitMeterCreditSpec,
+  BenefitResource,
+  BenefitSpec,
+  CurrentBenefitResource,
+  MeterCreditBenefitConfig,
+  MeterReference,
+} from "./resources/benefit.js";
+export {
   Meter,
   aggregate,
   and,

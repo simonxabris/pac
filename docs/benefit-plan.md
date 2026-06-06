@@ -41,7 +41,7 @@ export const requests = new Meter("requests", {
 });
 
 export const includedRequests = new Benefit("included-requests", {
-  type: "meterCredit",
+  type: "meter-credit",
   description: "10,000 API requests per billing period",
   meter: requests,
   units: 10_000,
@@ -60,7 +60,7 @@ Address strings remain supported for references:
 
 ```ts
 new Benefit("included-requests", {
-  type: "meterCredit",
+  type: "meter-credit",
   description: "10,000 API requests per billing period",
   meter: "meter.requests",
   units: 10_000,
@@ -83,7 +83,7 @@ type MeterReference = MeterAddress | Pick<Meter, "address">;
 type BenefitReference = BenefitAddress | Pick<Benefit, "address">;
 
 type MeterCreditBenefitConfig = {
-  readonly type: "meterCredit";
+  readonly type: "meter-credit";
   readonly description: string;
   readonly meter: MeterReference;
   readonly units: number;
@@ -103,7 +103,7 @@ The single `Benefit` class is intentional. Benefit types are a discriminated
 configuration union, matching Polar's API model. Future types add a config/spec
 variant and adapter branches, not a new resource kind or lifecycle.
 
-Public names use PAAC's camel-case convention (`meterCredit`); the adapter maps
+Public names use PAAC's kebab-case convention (`meter-credit`); the adapter maps
 this to Polar's `meter_credit`.
 
 Defaults and validation:
@@ -121,7 +121,7 @@ Add `benefit` to `ResourceKind`.
 
 ```ts
 type BenefitMeterCreditSpec = {
-  readonly type: "meterCredit";
+  readonly type: "meter-credit";
   readonly description: string;
   readonly meter: MeterAddress;
   readonly units: number;
@@ -483,10 +483,69 @@ Renderer/CLI tests:
 
 ## Implementation Order
 
+Each remaining step should be small enough to review independently and should
+land with tests at the resource, adapter, or service boundary it changes.
+
 1. [x] Generalize Archive to Remove and add deletion safety.
-2. Add Benefit domain types, schemas, exports, and adapter registration.
-3. Add Polar Benefit client methods and operation actions.
-4. Add remote Benefit decoding.
-5. Add Product Benefit attachment modeling and operations.
-6. Add planner/executor/renderer integration tests.
-7. Update documentation.
+
+2. [x] Add the Benefit resource API and canonical schemas.
+   - Deliverable: `Benefit` can be declared in config and converted to a
+     canonical `DesiredResource` with kind `benefit`.
+   - Scope: `src/core/kind.ts`, `src/resources/benefit.ts`, schema exports, and
+     public exports from `src/index.ts`.
+   - Tests: resource-level tests for `meter` reference normalization,
+     `rollover` defaulting, description/unit validation, and canonical
+     `BenefitSpec` output.
+
+3. [ ] Add Benefit operation payloads and adapter planning.
+   - Deliverable: a managed Benefit can produce create, update, noop, blocked,
+     and delete-mode remove plan/operation output without calling Polar.
+   - Scope: `src/operations/payloads/benefit.ts`, Benefit operation action
+     types, `src/resources/benefit-adapter.ts`, and adapter registration.
+   - Tests: adapter-level tests for Meter dependency discovery, field-level
+     diffing, blocked type changes, create/update/delete payloads, removal mode
+     `delete`, and rollback behavior.
+
+4. [ ] Add Polar Benefit client/service methods.
+   - Deliverable: `PolarClient` exposes `listBenefits`, `createBenefit`,
+     `updateBenefit`, and `deleteBenefit` with typed payload/result shapes.
+   - Scope: `src/polar/client.ts` / `src/polar/service.ts` and any shared remote
+     Benefit type exports.
+   - Tests: service-level tests or focused client-shape tests proving the Polar
+     SDK calls are mapped to the expected methods and payload wrappers.
+
+5. [ ] Add remote Benefit fetching and decoding.
+   - Deliverable: managed remote meter-credit Benefits are decoded into current
+     Benefit resources and skipped when already removed.
+   - Scope: `src/remote-resource-fetcher.ts`, including concurrent Benefit
+     listing and decode order `Meter -> Benefit -> Product`.
+   - Tests: service/fetcher-level tests for meter-credit decode, deleted Benefit
+     skip behavior, unknown Meter diagnostics/errors, unsupported Benefit type,
+     and malformed PAAC metadata.
+
+6. [ ] Add Product Benefit attachment modeling and adapter operations.
+   - Deliverable: Products can declare an authoritative Benefit attachment set,
+     and attachment-only drift plans as a Product update operation.
+   - Scope: `src/resources/product.ts`, `src/resources/product-adapter.ts`,
+     `src/operations/payloads/product.ts`, and the Product Benefit operation
+     action.
+   - Tests: resource/adapter-level tests for Benefit reference normalization,
+     dedupe/sort, dependency discovery, attachment diffs, update payloads,
+     rollback payloads, and unmanaged attached Benefit diagnostics.
+
+7. [ ] Wire executor dispatch and operation-planner integration.
+   - Deliverable: planned Benefit and Product-Benefit operations execute in the
+     correct dependency order with nested reference resolution.
+   - Scope: `src/executor.ts`, operation action dispatch, and operation planner
+     integration cases across `Product -> Benefit -> Meter`.
+   - Tests: executor/operation-planner tests for Benefit client dispatch paths,
+     nested Benefit Meter and Product Benefit ID refs, create ordering
+     `Meter -> Benefit -> Product`, removal ordering
+     `Product -> Benefit -> Meter`, Noop omission, and rollback ordering.
+
+8. [ ] Update user-facing docs and examples.
+   - Deliverable: the public API example and project context describe Benefits,
+     removal modes, and deletion safety in current terminology.
+   - Scope: `CONTEXT.md`, `paac.config.ts` examples, operation/executor design
+     docs, and any ADR follow-ups discovered during implementation.
+   - Tests: documentation review plus existing typecheck/test suite.
