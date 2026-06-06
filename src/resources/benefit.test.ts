@@ -32,6 +32,39 @@ describe("Benefit", () => {
     });
   });
 
+  it("creates a canonical custom Benefit resource", () => {
+    const benefit = new Benefit("onboarding", {
+      type: "custom",
+      description: "Your onboarding link",
+      note: "Book here: [Calendly](https://calendly.com/acme/onboarding)",
+    });
+
+    expect(benefit.toDesiredResource()).toEqual({
+      source: "desired",
+      kind: "benefit",
+      key: "onboarding",
+      address: "benefit.onboarding",
+      spec: {
+        type: "custom",
+        description: "Your onboarding link",
+        note: "Book here: [Calendly](https://calendly.com/acme/onboarding)",
+      },
+    });
+  });
+
+  it("defaults custom Benefit note to null", () => {
+    const benefit = new Benefit("onboarding", {
+      type: "custom",
+      description: "Your onboarding link",
+    });
+
+    expect(benefit.toDesiredResource().spec).toEqual({
+      type: "custom",
+      description: "Your onboarding link",
+      note: null,
+    });
+  });
+
   it("normalizes a Meter instance reference to its address", () => {
     const meter = new Meter("requests", {
       name: "Requests",
@@ -45,7 +78,7 @@ describe("Benefit", () => {
       units: 10_000,
     });
 
-    expect(benefit.toDesiredResource().spec.meter).toBe("meter.requests");
+    expect(benefit.toDesiredResource().spec).toMatchObject({ type: "meter-credit", meter: "meter.requests" });
   });
 
   it("normalizes a Meter address string", () => {
@@ -56,7 +89,7 @@ describe("Benefit", () => {
       units: 10_000,
     });
 
-    expect(benefit.toDesiredResource().spec.meter).toBe("meter.requests");
+    expect(benefit.toDesiredResource().spec).toMatchObject({ type: "meter-credit", meter: "meter.requests" });
   });
 
   it("defaults rollover to false", () => {
@@ -67,7 +100,7 @@ describe("Benefit", () => {
       units: 10_000,
     });
 
-    expect(benefit.toDesiredResource().spec.rollover).toBe(false);
+    expect(benefit.toDesiredResource().spec).toMatchObject({ type: "meter-credit", rollover: false });
   });
 
   it("validates description length", () => {
