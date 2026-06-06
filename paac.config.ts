@@ -14,6 +14,12 @@ export const includedTokens = new Benefit("included-tokens", {
   units: 10_000,
 });
 
+export const customBenefit = new Benefit("custom-note", {
+  type: "custom",
+  description: "Invite link",
+  note: "Visit this link",
+});
+
 export const pro = new Product("pro", {
   name: "Paac Pro plan",
   description: "For serious users",
@@ -23,5 +29,5 @@ export const pro = new Product("pro", {
   ],
   recurringIntervalCount: 1,
   recurringInterval: "month",
-  benefits: [includedTokens],
+  benefits: [includedTokens, customBenefit],
 });
