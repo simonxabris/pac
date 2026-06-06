@@ -13,6 +13,7 @@ import type { CurrentResource } from "./core/resource.js";
 import { PolarClient } from "./polar/service.js";
 import {
   CurrentBenefitResourceSchema,
+  type BenefitAddress,
   type CurrentBenefitResource,
 } from "./resources/benefit.js";
 import {
@@ -92,6 +93,10 @@ const RemoteProductPrice = Schema.Union([
 
 type RemoteProductPrice = typeof RemoteProductPrice.Type;
 
+const RemoteProductBenefit = Schema.Struct({
+  id: Schema.String,
+});
+
 const RemoteProductSdk = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -113,11 +118,13 @@ const RemoteProductSdk = Schema.Struct({
   isArchived: Schema.Boolean,
   metadata: MetadataRecord,
   prices: Schema.Array(RemoteProductPrice),
+  benefits: Schema.Array(RemoteProductBenefit),
 });
 
 const RemoteProductResourceInput = Schema.Struct({
   product: RemoteProductSdk,
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
+  benefitAddressesById: Schema.Record(Schema.String, Schema.TemplateLiteral(["benefit.", Schema.String])),
 });
 
 const RemoteBenefitMeterCreditSdk = Schema.Struct({
@@ -240,10 +247,20 @@ const productPriceToSpec = (
 const productToCurrentResource = ({
   product,
   meterAddressesById,
+  benefitAddressesById,
 }: typeof RemoteProductResourceInput.Type): CurrentProductResource => {
   const identity = identityForKind("product", product.metadata);
   const activePrices = product.prices.filter((price) => !price.isArchived);
   const prices = activePrices.map((price) => productPriceToSpec(price, meterAddressesById));
+  const attachedBenefits = product.benefits.map((benefit) => ({
+    polarBenefitId: benefit.id,
+    address: benefitAddressesById[benefit.id] ?? null,
+  }));
+  const benefits = [
+    ...new Set(
+      attachedBenefits.flatMap((benefit) => benefit.address === null ? [] : [benefit.address]),
+    ),
+  ].sort() as ReadonlyArray<BenefitAddress>;
 
   return {
     source: "current",
@@ -256,6 +273,7 @@ const productToCurrentResource = ({
       name: product.name,
       description: product.description,
       prices,
+      benefits,
       visibility: product.visibility,
       recurringInterval: product.recurringInterval,
       recurringIntervalCount:
@@ -266,6 +284,7 @@ const productToCurrentResource = ({
         polarPriceId: price.id,
         spec: prices[index] as ProductPriceSpec,
       })),
+      benefits: attachedBenefits,
     },
     raw: product,
   };
@@ -283,6 +302,9 @@ const productResourceToRemoteInput = (
     recurringIntervalCount: resource.spec.recurringIntervalCount,
     isArchived: resource.isRemoved,
     metadata: {},
+    benefits: resource.providerState.benefits.map((benefit) => ({
+      id: benefit.polarBenefitId,
+    })),
     prices: resource.spec.prices.map((price, index) => {
       const providerPrice = resource.providerState.prices[index];
       if (providerPrice === undefined) {
@@ -324,6 +346,7 @@ const productResourceToRemoteInput = (
     }),
   },
   meterAddressesById: {},
+  benefitAddressesById: {},
 });
 
 const benefitToCurrentResource = ({
@@ -524,10 +547,14 @@ export class RemoteResourceFetcher extends Context.Service<
               { concurrency: "unbounded" },
             );
 
+            const benefitAddressesById = Object.fromEntries(
+              benefits.map((benefit) => [benefit.polarId, benefit.address]),
+            ) as Record<string, BenefitAddress>;
+
             const products = yield* Effect.forEach(
               remoteProducts.filter(hasPaacMetadata),
               (product) =>
-                decodeRemoteProductResource({ product, meterAddressesById }).pipe(
+                decodeRemoteProductResource({ product, meterAddressesById, benefitAddressesById }).pipe(
                   Effect.mapError(
                     (cause) =>
                       new RemoteResourceFetchError({

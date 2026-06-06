@@ -138,6 +138,9 @@ export class Executor extends Context.Service<
 
           case "ArchiveProduct":
             return polar.archiveProduct(action.id);
+
+          case "UpdateProductBenefits":
+            return Effect.die(new Error("Product Benefit operation execution is not implemented yet."));
         }
       };
 

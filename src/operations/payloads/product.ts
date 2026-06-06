@@ -42,3 +42,7 @@ export type ProductUpdateOperationPayload = Omit<ProductUpdate, "prices"> & {
 export type ProductArchiveOperationPayload = {
   readonly isArchived: true;
 };
+
+export type ProductBenefitsUpdateOperationPayload = {
+  readonly benefits: ReadonlyArray<Resolvable<string>>;
+};

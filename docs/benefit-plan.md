@@ -466,7 +466,7 @@ Remote fetcher tests:
 
 - meter-credit decode;
 - Product attachment decode;
-- deleted Benefits are skipped as already removed;
+- deleted Benefits are preserved as already removed current resources;
 - unknown Meter, unsupported Benefit type, malformed metadata, and unmanaged
   Product attachment behavior.
 
@@ -516,14 +516,14 @@ land with tests at the resource, adapter, or service boundary it changes.
 
 5. [x] Add remote Benefit fetching and decoding.
    - Deliverable: managed remote meter-credit Benefits are decoded into current
-     Benefit resources and skipped when already removed.
+     Benefit resources, including already removed resources for planner handling.
    - Scope: `src/remote-resource-fetcher.ts`, including concurrent Benefit
      listing and decode order `Meter -> Benefit -> Product`.
    - Tests: service/fetcher-level tests for meter-credit decode, deleted Benefit
      skip behavior, unknown Meter diagnostics/errors, unsupported Benefit type,
      and malformed PAAC metadata.
 
-6. [ ] Add Product Benefit attachment modeling and adapter operations.
+6. [x] Add Product Benefit attachment modeling and adapter operations.
    - Deliverable: Products can declare an authoritative Benefit attachment set,
      and attachment-only drift plans as a Product update operation.
    - Scope: `src/resources/product.ts`, `src/resources/product-adapter.ts`,

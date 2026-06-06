@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Product, fixedPrice, freePrice, customPrice, meteredUnitPrice, productSpec } from "./product.js";
+import { Benefit } from "./benefit.js";
 import { Meter } from "./meter.js";
 import { resetRegistry } from "./registry.js";
 
@@ -26,6 +27,7 @@ describe("Product", () => {
           name: "Premium Plan",
           description: null,
           prices: [{ type: "fixed", amount: "200000", currency: "usd" }],
+          benefits: [],
           visibility: "public",
           recurringInterval: null,
           recurringIntervalCount: null,
@@ -89,6 +91,7 @@ describe("Product", () => {
           name: "Free Tier",
           description: null,
           prices: [{ type: "free", currency: "usd" }],
+          benefits: [],
           visibility: "public",
           recurringInterval: null,
           recurringIntervalCount: null,
@@ -296,6 +299,65 @@ describe("Product", () => {
     });
   });
 
+  describe("benefits", () => {
+    it("normalizes Benefit instance and address references, then sorts them", () => {
+      const requests = new Meter("requests", {
+        name: "Requests",
+        filter: { conjunction: "and", clauses: [] },
+        aggregation: { func: "count" },
+      });
+      const includedRequests = new Benefit("included-requests", {
+        type: "meter-credit",
+        description: "Included requests",
+        meter: requests,
+        units: 10_000,
+      });
+
+      const product = new Product("pro", {
+        name: "Pro",
+        prices: [freePrice({ currency: "usd" })],
+        benefits: ["benefit.z-extra", includedRequests],
+      });
+
+      expect(product.toDesiredResource().spec.benefits).toEqual([
+        "benefit.included-requests",
+        "benefit.z-extra",
+      ]);
+    });
+
+    it("rejects duplicate Benefit references", () => {
+      const requests = new Meter("requests", {
+        name: "Requests",
+        filter: { conjunction: "and", clauses: [] },
+        aggregation: { func: "count" },
+      });
+      const includedRequests = new Benefit("included-requests", {
+        type: "meter-credit",
+        description: "Included requests",
+        meter: requests,
+        units: 10_000,
+      });
+      const product = new Product("pro", {
+        name: "Pro",
+        prices: [freePrice({ currency: "usd" })],
+        benefits: [includedRequests, "benefit.included-requests"],
+      });
+
+      expect(() => product.toDesiredResource()).toThrow(
+        "Product benefits contain duplicate reference 'benefit.included-requests'.",
+      );
+    });
+
+    it("defaults benefits to an empty authoritative set", () => {
+      const product = new Product("pro", {
+        name: "Pro",
+        prices: [freePrice({ currency: "usd" })],
+      });
+
+      expect(product.toDesiredResource().spec.benefits).toEqual([]);
+    });
+  });
+
   describe("defaults and overrides", () => {
     it("defaults visibility to public", () => {
       const product = new Product("default-vis", {
@@ -422,6 +484,7 @@ describe("Product", () => {
         name: "Direct Spec",
         description: null,
         prices: [{ type: "fixed", amount: "99900", currency: "usd" }],
+        benefits: [],
         visibility: "public",
         recurringInterval: null,
         recurringIntervalCount: null,

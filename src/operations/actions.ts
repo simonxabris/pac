@@ -9,6 +9,7 @@ import type {
 } from "./payloads/meter.js";
 import type {
   ProductArchiveOperationPayload,
+  ProductBenefitsUpdateOperationPayload,
   ProductCreateOperationPayload,
   ProductUpdateOperationPayload,
 } from "./payloads/product.js";
@@ -64,6 +65,12 @@ export type ArchiveProductAction = {
   readonly payload: ProductArchiveOperationPayload;
 };
 
+export type UpdateProductBenefitsAction = {
+  readonly _tag: "UpdateProductBenefits";
+  readonly id: Resolvable<string>;
+  readonly payload: ProductBenefitsUpdateOperationPayload;
+};
+
 export type OperationAction =
   | CreateMeterAction
   | UpdateMeterAction
@@ -73,4 +80,5 @@ export type OperationAction =
   | DeleteBenefitAction
   | CreateProductAction
   | UpdateProductAction
-  | ArchiveProductAction;
+  | ArchiveProductAction
+  | UpdateProductBenefitsAction;

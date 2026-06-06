@@ -162,6 +162,248 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
     }),
   );
 
+  it.effect("creates an attachment operation after product creation when Benefits are declared", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+        benefits: ["benefit.requests", "benefit.seats"],
+      }).toDesiredResource();
+
+      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Create",
+          address: desired.address,
+          kind: "product",
+          desired,
+        },
+        {
+          nextOperationId: (() => {
+            let index = 1;
+            return () => `op_${index++}`;
+          })(),
+        },
+      );
+
+      expect(operations.map((operation) => operation.action)).toEqual([
+        {
+          _tag: "CreateProduct",
+          payload: {
+            metadata: {
+              paac: JSON.stringify({
+                v: 1,
+                kind: "product",
+                addr: "product.pro",
+                key: "pro",
+              }),
+            },
+            name: "Pro",
+            description: null,
+            visibility: "public",
+            prices: [
+              {
+                amountType: "fixed",
+                priceCurrency: "usd",
+                priceAmount: 300000,
+              },
+            ],
+            recurringInterval: null,
+            recurringIntervalCount: null,
+          },
+        },
+        {
+          _tag: "UpdateProductBenefits",
+          id: {
+            _tag: "Ref",
+            address: "product.pro",
+            field: "polarId",
+          },
+          payload: {
+            benefits: [
+              {
+                _tag: "Ref",
+                address: "benefit.requests",
+                field: "polarId",
+              },
+              {
+                _tag: "Ref",
+                address: "benefit.seats",
+                field: "polarId",
+              },
+            ],
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("creates Product Benefit update and rollback payloads for attachment-only changes", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+        benefits: ["benefit.new"],
+      }).toDesiredResource();
+      const current = currentProductResource({
+        desired,
+        spec: {
+          ...desired.spec,
+          benefits: ["benefit.old"],
+        },
+        providerState: {
+          prices: [
+            {
+              polarPriceId: "polar-price-0",
+              spec: desired.spec.prices[0]!,
+            },
+          ],
+          benefits: [
+            {
+              polarBenefitId: "ben_old",
+              address: "benefit.old",
+            },
+          ],
+        },
+      });
+
+      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "product",
+          desired,
+          current,
+          changes: [
+            {
+              _tag: "FieldChange",
+              path: ["benefits"],
+              before: ["benefit.old"],
+              after: ["benefit.new"],
+            },
+          ],
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations).toEqual([
+        {
+          _tag: "Operation",
+          id: "op_1",
+          address: "product.pro",
+          kind: "product",
+          action: {
+            _tag: "UpdateProductBenefits",
+            id: "polar-pro",
+            payload: {
+              benefits: [
+                {
+                  _tag: "Ref",
+                  address: "benefit.new",
+                  field: "polarId",
+                },
+              ],
+            },
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProductBenefits",
+              id: "polar-pro",
+              payload: { benefits: ["ben_old"] },
+            },
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("creates ordinary Product update before attachment update when both change", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "New Pro",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+        benefits: ["benefit.new"],
+      }).toDesiredResource();
+      const current = currentProductResource({
+        desired,
+        spec: {
+          ...desired.spec,
+          name: "Old Pro",
+          benefits: [],
+        },
+      });
+
+      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "product",
+          desired,
+          current,
+          changes: [
+            { _tag: "FieldChange", path: ["name"], before: "Old Pro", after: "New Pro" },
+            { _tag: "FieldChange", path: ["benefits"], before: [], after: ["benefit.new"] },
+          ],
+        },
+        {
+          nextOperationId: (() => {
+            let index = 1;
+            return () => `op_${index++}`;
+          })(),
+        },
+      );
+
+      expect(operations).toEqual([
+        {
+          _tag: "Operation",
+          id: "op_1",
+          address: "product.pro",
+          kind: "product",
+          action: {
+            _tag: "UpdateProduct",
+            id: "polar-pro",
+            payload: { name: "New Pro" },
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProduct",
+              id: "polar-pro",
+              payload: { name: "Old Pro" },
+            },
+          },
+        },
+        {
+          _tag: "Operation",
+          id: "op_2",
+          address: "product.pro",
+          kind: "product",
+          action: {
+            _tag: "UpdateProductBenefits",
+            id: "polar-pro",
+            payload: {
+              benefits: [
+                {
+                  _tag: "Ref",
+                  address: "benefit.new",
+                  field: "polarId",
+                },
+              ],
+            },
+          },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProductBenefits",
+              id: "polar-pro",
+              payload: { benefits: [] },
+            },
+          },
+        },
+      ]);
+    }),
+  );
+
   it.effect("creates Polar-shaped update product payloads and rollback payloads", () =>
     Effect.gen(function*() {
       const desired = new Product("pro", {
@@ -365,6 +607,109 @@ describe("ProductResourceAdapter.diff", () => {
           ],
         },
         diagnostics: [],
+      });
+    }),
+  );
+
+  it.effect("returns Benefit and metered-price Meter dependencies", () =>
+    Effect.gen(function*() {
+      const desired = new Product("usage", {
+        name: "Usage",
+        prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.02", currency: "usd" })],
+        benefits: ["benefit.included-requests", "benefit.seats"],
+      }).toDesiredResource();
+
+      const dependencies = yield* ProductResourceAdapter.dependencies(desired);
+
+      expect(dependencies).toEqual([
+        "meter.requests",
+        "benefit.included-requests",
+        "benefit.seats",
+      ]);
+    }),
+  );
+
+  it.effect("returns an attachment-only update when Benefit attachments drift", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+        benefits: ["benefit.new"],
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, {
+        ...desired.spec,
+        benefits: ["benefit.old"],
+      });
+
+      const result = yield* ProductResourceAdapter.diff(desired, current);
+
+      expect(result).toEqual({
+        _tag: "Planned",
+        node: {
+          _tag: "Update",
+          address: "product.pro",
+          kind: "product",
+          desired,
+          current,
+          changes: [
+            {
+              _tag: "FieldChange",
+              path: ["benefits"],
+              before: ["benefit.old"],
+              after: ["benefit.new"],
+            },
+          ],
+        },
+        diagnostics: [],
+      });
+    }),
+  );
+
+  it.effect("blocks Products with unmanaged attached Benefits", () =>
+    Effect.gen(function*() {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+      }).toDesiredResource();
+      const current = currentProductResource({
+        desired,
+        providerState: {
+          prices: [
+            {
+              polarPriceId: "polar-price-0",
+              spec: desired.spec.prices[0]!,
+            },
+          ],
+          benefits: [
+            {
+              polarBenefitId: "ben_unmanaged",
+              address: null,
+            },
+          ],
+        },
+      });
+
+      const result = yield* ProductResourceAdapter.diff(desired, current);
+
+      expect(result).toEqual({
+        _tag: "Blocked",
+        node: {
+          _tag: "Blocked",
+          address: "product.pro",
+          kind: "product",
+          desired,
+          current,
+        },
+        diagnostics: [
+          {
+            _tag: "Diagnostic",
+            severity: "error",
+            code: "product.benefits.unmanaged",
+            address: "product.pro",
+            path: ["benefits"],
+            message: "Product has unmanaged Polar Benefit attachments: ben_unmanaged.",
+          },
+        ],
       });
     }),
   );

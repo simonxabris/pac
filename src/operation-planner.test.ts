@@ -184,6 +184,7 @@ const simpleProductSpec: ProductSpec = {
   name: "Test Product",
   description: null,
   prices: [{ type: "fixed", amount: "1000", currency: "usd" }],
+  benefits: [],
   visibility: "public",
   recurringInterval: null,
   recurringIntervalCount: null,
