@@ -290,7 +290,7 @@ const createProductOperationFromPlanNode = (
         },
       };
     }
-    case "Archive":
+    case "Remove":
       return {
         _tag: "Operation",
         id,
@@ -308,6 +308,7 @@ const createProductOperationFromPlanNode = (
 
 export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> = {
   kind: "product",
+  removalMode: "archive",
 
   dependencies: (desired) =>
     Effect.succeed([

@@ -229,7 +229,7 @@ const productToCurrentResource = ({
     key: identity.key,
     address: identity.address as `product.${string}`,
     polarId: product.id,
-    isArchived: product.isArchived,
+    isRemoved: product.isArchived,
     spec: {
       name: product.name,
       description: product.description,
@@ -259,7 +259,7 @@ const productResourceToRemoteInput = (
     visibility: resource.spec.visibility,
     recurringInterval: resource.spec.recurringInterval,
     recurringIntervalCount: resource.spec.recurringIntervalCount,
-    isArchived: resource.isArchived,
+    isArchived: resource.isRemoved,
     metadata: {},
     prices: resource.spec.prices.map((price, index) => {
       const providerPrice = resource.providerState.prices[index];
@@ -312,7 +312,7 @@ const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeter
     key: identity.key,
     address: identity.address as `meter.${string}`,
     polarId: meter.id,
-    isArchived: meter.archivedAt != null,
+    isRemoved: meter.archivedAt != null,
     spec: {
       name: meter.name,
       unit: meter.unit,

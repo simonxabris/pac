@@ -151,7 +151,7 @@ const createMeterOperationFromPlanNode = (
         },
       };
     }
-    case "Archive":
+    case "Remove":
       return {
         _tag: "Operation",
         id,
@@ -169,6 +169,7 @@ const createMeterOperationFromPlanNode = (
 
 export const MeterResourceAdapter: ResourceAdapter<MeterKind, MeterSpec> = {
   kind: "meter",
+  removalMode: "archive",
 
   dependencies: () => Effect.succeed([]),
 

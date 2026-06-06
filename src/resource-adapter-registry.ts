@@ -6,8 +6,9 @@ import type { CurrentResource, DesiredResource } from "./core/resource.js";
 import type { OperationId } from "./operation-planner/types.js";
 import type { Operation } from "./operations/operation.js";
 import type {
-  ArchivePlanNode,
   CreatePlanNode,
+  RemovePlanNode,
+  RemovalMode,
   ResourceDiffResult,
   UpdatePlanNode,
 } from "./planner.js";
@@ -25,8 +26,8 @@ export type ResourceUpdatePlanNode<Kind extends ResourceKind = ResourceKind, Spe
     readonly current: CurrentResource<Kind, Spec>;
   };
 
-export type ResourceArchivePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
-  ArchivePlanNode & {
+export type ResourceRemovePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
+  RemovePlanNode & {
     readonly kind: Kind;
     readonly current: CurrentResource<Kind, Spec>;
   };
@@ -34,7 +35,7 @@ export type ResourceArchivePlanNode<Kind extends ResourceKind = ResourceKind, Sp
 export type ResourceExecutablePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
   | ResourceCreatePlanNode<Kind, Spec>
   | ResourceUpdatePlanNode<Kind, Spec>
-  | ResourceArchivePlanNode<Kind, Spec>;
+  | ResourceRemovePlanNode<Kind, Spec>;
 
 export type CreateOperationsFromPlanContext = {
   readonly nextOperationId: () => OperationId;
@@ -56,6 +57,7 @@ export class ResourceAdapterPlanError extends Schema.TaggedErrorClass<ResourceAd
 
 export type ResourceAdapter<Kind extends ResourceKind = ResourceKind, Spec = unknown> = {
   readonly kind: Kind;
+  readonly removalMode: RemovalMode;
 
   readonly dependencies: (
     resource: DesiredResource<Kind, Spec> | CurrentResource<Kind, Spec>,
@@ -74,6 +76,7 @@ export type ResourceAdapter<Kind extends ResourceKind = ResourceKind, Spec = unk
 
 export type AnyResourceAdapter = {
   readonly kind: ResourceKind;
+  readonly removalMode: RemovalMode;
 
   readonly dependencies: (
     resource: DesiredResource | CurrentResource,
@@ -94,6 +97,7 @@ export const eraseResourceAdapter = <Kind extends ResourceKind, Spec>(
   adapter: ResourceAdapter<Kind, Spec>,
 ): AnyResourceAdapter => ({
   kind: adapter.kind,
+  removalMode: adapter.removalMode,
   dependencies: (resource) =>
     adapter.dependencies(resource as DesiredResource<Kind, Spec> | CurrentResource<Kind, Spec>),
   diff: (desired, current) =>

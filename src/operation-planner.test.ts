@@ -8,7 +8,6 @@ import type {
 import type { ResourceKind } from "./core/kind.js";
 import type { CurrentResource, DesiredResource } from "./core/resource.js";
 import type {
-  ArchivePlanNode,
   BlockedPlanNode,
   CreatePlanNode,
   Diagnostic,
@@ -16,6 +15,7 @@ import type {
   Plan,
   PlanEdge,
   PlanNode,
+  RemovePlanNode,
   UpdatePlanNode,
   FieldChange,
 } from "./planner.js";
@@ -48,7 +48,7 @@ const makeCurrentResource = <K extends ResourceKind, S>(
   key,
   address: `${kind}.${key}` as ResourceAddress<K>,
   polarId,
-  isArchived: false,
+  isRemoved: false,
   spec,
 });
 
@@ -74,10 +74,11 @@ const updateNode = <K extends ResourceKind, S>(
   changes,
 });
 
-const archiveNode = <K extends ResourceKind, S>(
+const removeNode = <K extends ResourceKind, S>(
   current: CurrentResource<K, S>,
-): ArchivePlanNode => ({
-  _tag: "Archive",
+): RemovePlanNode => ({
+  _tag: "Remove",
+  mode: "archive",
   address: current.address,
   kind: current.kind,
   current,
@@ -129,7 +130,7 @@ const desiredResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArra
         return [node.desired];
       case "Blocked":
         return node.desired === undefined ? [] : [node.desired];
-      case "Archive":
+      case "Remove":
         return [];
     }
   });
@@ -138,7 +139,7 @@ const currentResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArra
   nodes.flatMap((node) => {
     switch (node._tag) {
       case "Update":
-      case "Archive":
+      case "Remove":
       case "Noop":
         return [node.current];
       case "Blocked":
@@ -227,13 +228,13 @@ describe("OperationPlanner.create", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
-  it.effect("orders archive dependents before dependencies", () =>
+  it.effect("orders remove dependents before dependencies", () =>
     Effect.gen(function*() {
       const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
       const productCurrent = makeCurrentResource("product", "pro", "polar-product-pro", simpleProductSpec);
 
       const plan = buildPlan({
-        nodes: [archiveNode(meterCurrent), archiveNode(productCurrent)],
+        nodes: [removeNode(meterCurrent), removeNode(productCurrent)],
         edges: [dependsOn("product.pro", "meter.requests")],
       });
 
@@ -413,16 +414,16 @@ describe("OperationPlanner.create", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
-  it.effect("orders archive of dependent before dependency even without explicit edge", () =>
+  it.effect("orders removal of dependent before dependency even without explicit edge", () =>
     Effect.gen(function*() {
-      // When archiving both a dependent and its dependency, the dependent
-      // must be archived first regardless of edge direction, since the
+      // When removing both a dependent and its dependency, the dependent
+      // must be removed first regardless of edge direction, since the
       // dependency edge goes dependent -> dependency.
       const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
       const productCurrent = makeCurrentResource("product", "pro", "polar-product-pro", simpleProductSpec);
 
       const plan = buildPlan({
-        nodes: [archiveNode(meterCurrent), archiveNode(productCurrent)],
+        nodes: [removeNode(meterCurrent), removeNode(productCurrent)],
         edges: [dependsOn("product.pro", "meter.requests")],
       });
 

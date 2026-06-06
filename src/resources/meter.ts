@@ -129,7 +129,7 @@ export const CurrentMeterResourceSchema = Schema.Struct({
   key: Schema.String,
   address: MeterAddressSchema,
   polarId: Schema.String,
-  isArchived: Schema.Boolean,
+  isRemoved: Schema.Boolean,
   spec: MeterSpecSchema,
   raw: Schema.optionalKey(Schema.Unknown),
 });

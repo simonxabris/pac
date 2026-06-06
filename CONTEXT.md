@@ -59,3 +59,15 @@ _Avoid_: Formula, metric type
 **Archived Meter**:
 A Meter that still exists in Polar but is no longer used for billing. PAAC archives missing Meter declarations rather than deleting them.
 _Avoid_: Deleted meter, removed meter
+
+**Benefit**:
+A standalone Polar entitlement declared as a PAAC resource and attached to one or more Products. A Benefit has a type-specific configuration and can be reused across Products.
+_Avoid_: Product feature, embedded benefit
+
+**Meter Credit Benefit**:
+A Benefit that grants units to a customer's Meter balance. Subscription Products grant the units each subscription cycle; one-time Products grant them once at purchase.
+_Avoid_: Credit balance, metered price, usage allowance
+
+**Product Benefit Attachment**:
+The authoritative set of Benefits granted by a Product. A Product depends on every attached Benefit.
+_Avoid_: Embedded benefit, benefit copy
