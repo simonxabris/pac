@@ -18,19 +18,21 @@ import {
   pushFieldChange,
   unsupportedRollback,
 } from "./adapter-utils.js";
-import type { BenefitKind, BenefitSpec } from "./benefit.js";
+import type { BenefitKind, BenefitMeterCreditSpec, BenefitSpec } from "./benefit.js";
 
 const benefitSpecType = (spec: BenefitSpec): string => spec.type;
 
-const benefitDependencies = (spec: BenefitSpec): ReadonlyArray<BenefitSpec["meter"]> => {
+const benefitDependencies = (spec: BenefitSpec): ReadonlyArray<BenefitMeterCreditSpec["meter"]> => {
   switch (spec.type) {
     case "meter-credit":
       return [spec.meter];
+    case "custom":
+      return [];
   }
 };
 
 const benefitMeterCreditPropertiesPayload = (
-  spec: BenefitSpec,
+  spec: BenefitMeterCreditSpec,
 ): BenefitMeterCreditPropertiesOperationPayload => ({
   meterId: polarIdRef(spec.meter),
   units: spec.units,
@@ -39,31 +41,66 @@ const benefitMeterCreditPropertiesPayload = (
 
 const benefitCreatePayload = (
   node: ResourceExecutablePlanNode<BenefitKind, BenefitSpec> & { readonly _tag: "Create" },
-): BenefitCreateOperationPayload => ({
-  metadata: managedMetadata(node.kind, node.address, node.desired.key),
-  type: "meter_credit",
-  description: node.desired.spec.description,
-  properties: benefitMeterCreditPropertiesPayload(node.desired.spec),
-});
+): BenefitCreateOperationPayload => {
+  const metadata = managedMetadata(node.kind, node.address, node.desired.key);
 
-const hasChanged = (changes: ReadonlyArray<FieldChange>, field: keyof BenefitSpec): boolean =>
+  switch (node.desired.spec.type) {
+    case "meter-credit":
+      return {
+        metadata,
+        type: "meter_credit",
+        description: node.desired.spec.description,
+        properties: benefitMeterCreditPropertiesPayload(node.desired.spec),
+      };
+    case "custom":
+      return {
+        metadata,
+        type: "custom",
+        description: node.desired.spec.description,
+        properties: { note: node.desired.spec.note },
+      };
+  }
+};
+
+type KeysOfUnion<T> = T extends T ? keyof T : never;
+
+type BenefitSpecField = KeysOfUnion<BenefitSpec>;
+
+const hasChanged = (changes: ReadonlyArray<FieldChange>, field: BenefitSpecField): boolean =>
   changes.some((change) => change.path[0] === field);
 
 const benefitUpdatePayload = (
   spec: BenefitSpec,
   changes: ReadonlyArray<FieldChange>,
 ): BenefitUpdateOperationPayload => {
-  const payload: BenefitUpdateOperationPayload = { type: "meter_credit" };
+  switch (spec.type) {
+    case "meter-credit": {
+      const payload: BenefitUpdateOperationPayload = { type: "meter_credit" };
 
-  if (hasChanged(changes, "description")) {
-    payload.description = spec.description;
+      if (hasChanged(changes, "description")) {
+        payload.description = spec.description;
+      }
+
+      if (hasChanged(changes, "meter") || hasChanged(changes, "units") || hasChanged(changes, "rollover")) {
+        payload.properties = benefitMeterCreditPropertiesPayload(spec);
+      }
+
+      return payload;
+    }
+    case "custom": {
+      const payload: BenefitUpdateOperationPayload = { type: "custom" };
+
+      if (hasChanged(changes, "description")) {
+        payload.description = spec.description;
+      }
+
+      if (hasChanged(changes, "note")) {
+        payload.properties = { note: spec.note };
+      }
+
+      return payload;
+    }
   }
-
-  if (hasChanged(changes, "meter") || hasChanged(changes, "units") || hasChanged(changes, "rollover")) {
-    payload.properties = benefitMeterCreditPropertiesPayload(spec);
-  }
-
-  return payload;
 };
 
 const createBenefitOperationFromPlanNode = (
@@ -165,9 +202,16 @@ export const BenefitResourceAdapter: ResourceAdapter<BenefitKind, BenefitSpec> =
       const changes: Array<FieldChange> = [];
 
       pushFieldChange(changes, ["description"], current.spec.description, desired.spec.description);
-      pushFieldChange(changes, ["meter"], current.spec.meter, desired.spec.meter);
-      pushFieldChange(changes, ["units"], current.spec.units, desired.spec.units);
-      pushFieldChange(changes, ["rollover"], current.spec.rollover, desired.spec.rollover);
+
+      if (desired.spec.type === "meter-credit" && current.spec.type === "meter-credit") {
+        pushFieldChange(changes, ["meter"], current.spec.meter, desired.spec.meter);
+        pushFieldChange(changes, ["units"], current.spec.units, desired.spec.units);
+        pushFieldChange(changes, ["rollover"], current.spec.rollover, desired.spec.rollover);
+      }
+
+      if (desired.spec.type === "custom" && current.spec.type === "custom") {
+        pushFieldChange(changes, ["note"], current.spec.note, desired.spec.note);
+      }
 
       if (changes.length === 0) {
         return {

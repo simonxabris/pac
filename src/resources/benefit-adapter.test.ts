@@ -37,6 +37,20 @@ describe("BenefitResourceAdapter", () => {
     }),
   );
 
+  it.effect("discovers no dependencies for custom Benefits", () =>
+    Effect.gen(function*() {
+      const desired = new Benefit("onboarding", {
+        type: "custom",
+        description: "Your onboarding link",
+        note: "# Welcome",
+      }).toDesiredResource();
+
+      const dependencies = yield* BenefitResourceAdapter.dependencies(desired);
+
+      expect(dependencies).toEqual([]);
+    }),
+  );
+
   it.effect("returns a planned noop when Benefit specs match", () =>
     Effect.gen(function*() {
       const desired = new Benefit("included-requests", {
@@ -224,6 +238,79 @@ describe("BenefitResourceAdapter", () => {
           },
         },
       ]);
+    }),
+  );
+
+  it.effect("creates a Polar-shaped custom Benefit create payload", () =>
+    Effect.gen(function*() {
+      const desired = new Benefit("onboarding", {
+        type: "custom",
+        description: "Your onboarding link",
+        note: "# Welcome",
+      }).toDesiredResource();
+
+      const operations = yield* BenefitResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Create",
+          address: desired.address,
+          kind: "benefit",
+          desired,
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations[0]?.action).toEqual({
+        _tag: "CreateBenefit",
+        payload: {
+          metadata: {
+            paac: JSON.stringify({
+              v: 1,
+              kind: "benefit",
+              addr: "benefit.onboarding",
+              key: "onboarding",
+            }),
+          },
+          type: "custom",
+          description: "Your onboarding link",
+          properties: { note: "# Welcome" },
+        },
+      });
+    }),
+  );
+
+  it.effect("creates a Polar-shaped custom Benefit update payload", () =>
+    Effect.gen(function*() {
+      const desired = new Benefit("onboarding", {
+        type: "custom",
+        description: "Your onboarding link",
+        note: "# Welcome",
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, {
+        type: "custom",
+        description: "Your onboarding link",
+        note: "Old note",
+      });
+
+      const operations = yield* BenefitResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "benefit",
+          desired,
+          current,
+          changes: [{ _tag: "FieldChange", path: ["note"], before: "Old note", after: "# Welcome" }],
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations[0]?.action).toEqual({
+        _tag: "UpdateBenefit",
+        id: "polar-onboarding",
+        payload: {
+          type: "custom",
+          properties: { note: "# Welcome" },
+        },
+      });
     }),
   );
 

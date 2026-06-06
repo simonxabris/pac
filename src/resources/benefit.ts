@@ -18,7 +18,13 @@ export type MeterCreditBenefitConfig = {
   readonly rollover?: boolean;
 };
 
-export type BenefitConfig = MeterCreditBenefitConfig;
+export type CustomBenefitConfig = {
+  readonly type: "custom";
+  readonly description: string;
+  readonly note?: string | null;
+};
+
+export type BenefitConfig = MeterCreditBenefitConfig | CustomBenefitConfig;
 
 export type BenefitMeterCreditSpec = {
   readonly type: "meter-credit";
@@ -28,7 +34,13 @@ export type BenefitMeterCreditSpec = {
   readonly rollover: boolean;
 };
 
-export type BenefitSpec = BenefitMeterCreditSpec;
+export type BenefitCustomSpec = {
+  readonly type: "custom";
+  readonly description: string;
+  readonly note: string | null;
+};
+
+export type BenefitSpec = BenefitMeterCreditSpec | BenefitCustomSpec;
 
 export type BenefitResource = DesiredResource<BenefitKind, BenefitSpec>;
 export type CurrentBenefitResource = CurrentResource<BenefitKind, BenefitSpec>;
@@ -49,7 +61,16 @@ export const BenefitMeterCreditSpecSchema = Schema.Struct({
   rollover: Schema.Boolean,
 });
 
-export const BenefitSpecSchema: Schema.Codec<BenefitSpec> = BenefitMeterCreditSpecSchema;
+export const BenefitCustomSpecSchema = Schema.Struct({
+  type: Schema.Literal("custom"),
+  description: BenefitDescriptionSchema,
+  note: Schema.NullOr(Schema.String),
+});
+
+export const BenefitSpecSchema: Schema.Codec<BenefitSpec> = Schema.Union([
+  BenefitMeterCreditSpecSchema,
+  BenefitCustomSpecSchema,
+]);
 
 export const BenefitResourceSchema = Schema.Struct({
   source: Schema.Literal("desired"),
@@ -88,6 +109,12 @@ export const benefitSpec = (config: BenefitConfig): BenefitSpec => {
         meter: decodeMeterAddress(meterReference(config.meter)),
         units: config.units,
         rollover: config.rollover ?? false,
+      });
+    case "custom":
+      return decodeBenefitSpec({
+        type: "custom",
+        description: config.description,
+        note: config.note ?? null,
       });
   }
 };

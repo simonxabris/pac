@@ -140,8 +140,21 @@ const RemoteBenefitMeterCreditSdk = Schema.Struct({
   }),
 });
 
+const RemoteBenefitCustomSdk = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("custom"),
+  description: Schema.String,
+  isDeleted: Schema.Boolean,
+  metadata: MetadataRecord,
+  properties: Schema.Struct({
+    note: Schema.NullOr(Schema.String),
+  }),
+});
+
+const RemoteBenefitSdk = Schema.Union([RemoteBenefitMeterCreditSdk, RemoteBenefitCustomSdk]);
+
 const RemoteBenefitResourceInput = Schema.Struct({
-  benefit: RemoteBenefitMeterCreditSdk,
+  benefit: RemoteBenefitSdk,
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
 });
 
@@ -354,48 +367,83 @@ const benefitToCurrentResource = ({
   meterAddressesById,
 }: typeof RemoteBenefitResourceInput.Type): CurrentBenefitResource => {
   const identity = identityForKind("benefit", benefit.metadata);
-  const meterAddress = meterAddressesById[benefit.properties.meterId];
-  if (meterAddress === undefined) {
-    throw new Error(
-      `Meter-credit benefit references unmanaged or unknown meter '${benefit.properties.meterId}'.`,
-    );
-  }
 
-  return {
-    source: "current",
-    kind: "benefit",
+  const base = {
+    source: "current" as const,
+    kind: "benefit" as const,
     key: identity.key,
     address: identity.address as `benefit.${string}`,
     polarId: benefit.id,
     isRemoved: benefit.isDeleted,
-    spec: {
-      type: "meter-credit",
-      description: benefit.description,
-      meter: meterAddress,
-      units: benefit.properties.units,
-      rollover: benefit.properties.rollover,
-    },
     raw: benefit,
   };
+
+  switch (benefit.type) {
+    case "meter_credit": {
+      const meterAddress = meterAddressesById[benefit.properties.meterId];
+      if (meterAddress === undefined) {
+        throw new Error(
+          `Meter-credit benefit references unmanaged or unknown meter '${benefit.properties.meterId}'.`,
+        );
+      }
+
+      return {
+        ...base,
+        spec: {
+          type: "meter-credit",
+          description: benefit.description,
+          meter: meterAddress,
+          units: benefit.properties.units,
+          rollover: benefit.properties.rollover,
+        },
+      };
+    }
+    case "custom":
+      return {
+        ...base,
+        spec: {
+          type: "custom",
+          description: benefit.description,
+          note: benefit.properties.note,
+        },
+      };
+  }
 };
 
 const benefitResourceToRemoteInput = (
   resource: CurrentBenefitResource,
-): typeof RemoteBenefitResourceInput.Type => ({
-  benefit: {
-    id: resource.polarId,
-    type: "meter_credit",
-    description: resource.spec.description,
-    isDeleted: resource.isRemoved,
-    metadata: {},
-    properties: {
-      units: resource.spec.units,
-      rollover: resource.spec.rollover,
-      meterId: resource.spec.meter,
-    },
-  },
-  meterAddressesById: {},
-});
+): typeof RemoteBenefitResourceInput.Type => {
+  switch (resource.spec.type) {
+    case "meter-credit":
+      return {
+        benefit: {
+          id: resource.polarId,
+          type: "meter_credit",
+          description: resource.spec.description,
+          isDeleted: resource.isRemoved,
+          metadata: {},
+          properties: {
+            units: resource.spec.units,
+            rollover: resource.spec.rollover,
+            meterId: resource.spec.meter,
+          },
+        },
+        meterAddressesById: {},
+      };
+    case "custom":
+      return {
+        benefit: {
+          id: resource.polarId,
+          type: "custom",
+          description: resource.spec.description,
+          isDeleted: resource.isRemoved,
+          metadata: {},
+          properties: { note: resource.spec.note },
+        },
+        meterAddressesById: {},
+      };
+  }
+};
 
 const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeterResource => {
   const identity = identityForKind("meter", meter.metadata);
