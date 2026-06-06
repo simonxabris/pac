@@ -1,10 +1,17 @@
-import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum } from "paac";
+import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "paac";
 
 export const tokens = new Meter("tokens", {
   name: "Paac tokens",
   unit: "token",
   filter: and(eventName("eq", "token_consumed")),
   aggregation: sum("total_tokens"),
+});
+
+export const includedTokens = new Benefit("included-tokens", {
+  type: "meter-credit",
+  description: "Included monthly tokens",
+  meter: tokens,
+  units: 10_000,
 });
 
 export const pro = new Product("pro", {
@@ -16,4 +23,5 @@ export const pro = new Product("pro", {
   ],
   recurringIntervalCount: 1,
   recurringInterval: "month",
+  benefits: [includedTokens],
 });

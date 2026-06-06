@@ -112,8 +112,9 @@ Defaults and validation:
 - `benefits` defaults to an empty authoritative set.
 - `description` must contain 3-42 characters.
 - `units` must be an integer from 1 through 2,147,483,647.
-- Product Benefit references are deduplicated and sorted by address because
-  attachment order has no documented meaning.
+- Product Benefit references are sorted by address because attachment order has
+  no documented meaning; duplicate references are rejected as configuration
+  errors.
 
 ## Canonical Resource Model
 
@@ -530,10 +531,10 @@ land with tests at the resource, adapter, or service boundary it changes.
      `src/operations/payloads/product.ts`, and the Product Benefit operation
      action.
    - Tests: resource/adapter-level tests for Benefit reference normalization,
-     dedupe/sort, dependency discovery, attachment diffs, update payloads,
+     sorting and duplicate rejection, dependency discovery, attachment diffs, update payloads,
      rollback payloads, and unmanaged attached Benefit diagnostics.
 
-7. [ ] Wire executor dispatch and operation-planner integration.
+7. [x] Wire executor dispatch and operation-planner integration.
    - Deliverable: planned Benefit and Product-Benefit operations execute in the
      correct dependency order with nested reference resolution.
    - Scope: `src/executor.ts`, operation action dispatch, and operation planner

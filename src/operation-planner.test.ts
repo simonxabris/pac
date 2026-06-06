@@ -20,8 +20,9 @@ import type {
   FieldChange,
 } from "./planner.js";
 import { ResourceAdapterRegistryLive } from "./resource-adapters.js";
+import type { BenefitSpec } from "./resources/benefit.js";
 import type { MeterSpec } from "./resources/meter.js";
-import type { ProductSpec } from "./resources/product.js";
+import type { CurrentProductProviderState, ProductSpec } from "./resources/product.js";
 
 // --- Plan construction helpers ---
 
@@ -76,9 +77,10 @@ const updateNode = <K extends ResourceKind, S>(
 
 const removeNode = <K extends ResourceKind, S>(
   current: CurrentResource<K, S>,
+  mode: "archive" | "delete" = "archive",
 ): RemovePlanNode => ({
   _tag: "Remove",
-  mode: "archive",
+  mode,
   address: current.address,
   kind: current.kind,
   current,
@@ -180,6 +182,28 @@ const simpleMeterSpec: MeterSpec = {
   aggregation: { func: "count" },
 };
 
+const simpleBenefitSpec: BenefitSpec = {
+  type: "meter-credit",
+  description: "Test Benefit",
+  meter: "meter.requests",
+  units: 10_000,
+  rollover: false,
+};
+
+const productProviderState = (
+  spec: ProductSpec,
+  benefitIds: ReadonlyArray<string> = [],
+): CurrentProductProviderState => ({
+  prices: spec.prices.map((price, index) => ({
+    polarPriceId: `price_${index}`,
+    spec: price,
+  })),
+  benefits: benefitIds.map((polarBenefitId, index) => ({
+    polarBenefitId,
+    address: spec.benefits[index] ?? null,
+  })),
+});
+
 const simpleProductSpec: ProductSpec = {
   name: "Test Product",
   description: null,
@@ -229,6 +253,128 @@ describe("OperationPlanner.create", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
+  it.effect("orders Meter, Benefit, Product, and Product Benefit attachment creation", () =>
+    Effect.gen(function*() {
+      const meterDesired = makeDesiredResource("meter", "requests", simpleMeterSpec);
+      const benefitDesired = makeDesiredResource("benefit", "included-requests", simpleBenefitSpec);
+      const productDesired = makeDesiredResource("product", "pro", {
+        ...simpleProductSpec,
+        benefits: ["benefit.included-requests"],
+      });
+
+      const plan = buildPlan({
+        nodes: [createNode(productDesired), createNode(benefitDesired), createNode(meterDesired)],
+        edges: [
+          dependsOn("benefit.included-requests", "meter.requests"),
+          dependsOn("product.pro", "benefit.included-requests"),
+        ],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
+
+      expect(operationSummary(operations)).toEqual([
+        { address: "meter.requests", kind: "meter", action: "CreateMeter" },
+        { address: "benefit.included-requests", kind: "benefit", action: "CreateBenefit" },
+        { address: "product.pro", kind: "product", action: "CreateProduct" },
+        { address: "product.pro", kind: "product", action: "UpdateProductBenefits" },
+      ]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("orders Product, Benefit, and Meter removals in reverse dependency order", () =>
+    Effect.gen(function*() {
+      const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
+      const benefitCurrent = makeCurrentResource(
+        "benefit",
+        "included-requests",
+        "polar-benefit-included-requests",
+        simpleBenefitSpec,
+      );
+      const productCurrent = {
+        ...makeCurrentResource("product", "pro", "polar-product-pro", {
+          ...simpleProductSpec,
+          benefits: ["benefit.included-requests"],
+        }),
+        providerState: productProviderState(
+          { ...simpleProductSpec, benefits: ["benefit.included-requests"] },
+          ["polar-benefit-included-requests"],
+        ),
+      };
+
+      const plan = buildPlan({
+        nodes: [removeNode(meterCurrent), removeNode(benefitCurrent, "delete"), removeNode(productCurrent)],
+        edges: [
+          dependsOn("benefit.included-requests", "meter.requests"),
+          dependsOn("product.pro", "benefit.included-requests"),
+        ],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
+
+      expect(operationSummary(operations)).toEqual([
+        { address: "product.pro", kind: "product", action: "ArchiveProduct" },
+        { address: "benefit.included-requests", kind: "benefit", action: "DeleteBenefit" },
+        { address: "meter.requests", kind: "meter", action: "ArchiveMeter" },
+      ]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("lowers Product Benefit attachment drift as a Product update operation", () =>
+    Effect.gen(function*() {
+      const desiredSpec: ProductSpec = {
+        ...simpleProductSpec,
+        benefits: ["benefit.included-requests"],
+      };
+      const currentSpec: ProductSpec = {
+        ...simpleProductSpec,
+        benefits: [],
+      };
+      const desired = makeDesiredResource("product", "pro", desiredSpec);
+      const current = {
+        ...makeCurrentResource("product", "pro", "polar-product-pro", currentSpec),
+        providerState: productProviderState(currentSpec),
+      };
+
+      const plan = buildPlan({
+        nodes: [
+          updateNode(desired, current, [
+            {
+              _tag: "FieldChange",
+              path: ["benefits"],
+              before: [],
+              after: ["benefit.included-requests"],
+            },
+          ]),
+        ],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
+
+      expect(operationSummary(operations)).toEqual([
+        { address: "product.pro", kind: "product", action: "UpdateProductBenefits" },
+      ]);
+      expect(operations[0]?.action).toEqual({
+        _tag: "UpdateProductBenefits",
+        id: "polar-product-pro",
+        payload: {
+          benefits: [
+            {
+              _tag: "Ref",
+              address: "benefit.included-requests",
+              field: "polarId",
+            },
+          ],
+        },
+      });
+    }).pipe(Effect.provide(testLayer)),
+  );
+
   it.effect("orders remove dependents before dependencies", () =>
     Effect.gen(function*() {
       const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
@@ -246,6 +392,51 @@ describe("OperationPlanner.create", () => {
       expect(operationSummary(operations)).toEqual([
         { address: "product.pro", kind: "product", action: "ArchiveProduct" },
         { address: "meter.requests", kind: "meter", action: "ArchiveMeter" },
+      ]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("plans Benefit create, update, and delete actions from Benefit plan nodes", () =>
+    Effect.gen(function*() {
+      const createDesired = makeDesiredResource("benefit", "new-benefit", {
+        ...simpleBenefitSpec,
+        description: "New Benefit",
+      });
+      const updateDesired = makeDesiredResource("benefit", "updated-benefit", {
+        ...simpleBenefitSpec,
+        units: 20_000,
+      });
+      const updateCurrent = makeCurrentResource(
+        "benefit",
+        "updated-benefit",
+        "polar-benefit-updated",
+        simpleBenefitSpec,
+      );
+      const removeCurrent = makeCurrentResource(
+        "benefit",
+        "old-benefit",
+        "polar-benefit-old",
+        simpleBenefitSpec,
+      );
+
+      const plan = buildPlan({
+        nodes: [
+          createNode(createDesired),
+          updateNode(updateDesired, updateCurrent, [
+            { _tag: "FieldChange", path: ["units"], before: 10_000, after: 20_000 },
+          ]),
+          removeNode(removeCurrent, "delete"),
+        ],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const program = yield* operationPlanner.create(plan);
+      const operations = program.operations;
+
+      expect(operationSummary(operations)).toEqual([
+        { address: "benefit.new-benefit", kind: "benefit", action: "CreateBenefit" },
+        { address: "benefit.updated-benefit", kind: "benefit", action: "UpdateBenefit" },
+        { address: "benefit.old-benefit", kind: "benefit", action: "DeleteBenefit" },
       ]);
     }).pipe(Effect.provide(testLayer)),
   );
@@ -330,6 +521,62 @@ describe("OperationPlanner.create", () => {
           ],
         },
       });
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("propagates missing-reference diagnostics from Benefit and Product dependencies", () =>
+    Effect.gen(function*() {
+      const benefitDesired = makeDesiredResource("benefit", "included-requests", simpleBenefitSpec);
+      const productDesired = makeDesiredResource("product", "pro", {
+        ...simpleProductSpec,
+        benefits: ["benefit.included-requests"],
+      });
+
+      const plan = buildPlan({
+        nodes: [
+          blockedNode("benefit.included-requests", "benefit", benefitDesired),
+          blockedNode("product.pro", "product", productDesired),
+        ],
+        diagnostics: [
+          {
+            _tag: "Diagnostic" as const,
+            severity: "error" as const,
+            code: "dependency.missing",
+            address: "benefit.included-requests",
+            message: "Resource benefit.included-requests depends on missing desired resource meter.requests.",
+          },
+          {
+            _tag: "Diagnostic" as const,
+            severity: "error" as const,
+            code: "dependency.missing",
+            address: "product.pro",
+            message: "Resource product.pro depends on missing desired resource benefit.included-requests.",
+          },
+        ],
+      });
+
+      const operationPlanner = yield* OperationPlanner;
+      const result = yield* operationPlanner.create(plan).pipe(
+        Effect.match({
+          onFailure: (error) => ({ _tag: "Failure" as const, error }),
+          onSuccess: (program) => ({ _tag: "Success" as const, program }),
+        }),
+      );
+
+      expect(result._tag).toBe("Failure");
+      if (result._tag === "Failure") {
+        expect(result.error).toBeInstanceOf(PlanNotExecutable);
+        if (result.error instanceof PlanNotExecutable) {
+          expect(result.error.blockedAddresses).toEqual([
+            "benefit.included-requests",
+            "product.pro",
+          ]);
+          expect(result.error.diagnosticCodes).toEqual([
+            "dependency.missing",
+            "dependency.missing",
+          ]);
+        }
+      }
     }).pipe(Effect.provide(testLayer)),
   );
 

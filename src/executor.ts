@@ -121,9 +121,18 @@ export class Executor extends Context.Service<
             return polar.archiveMeter(action.id);
 
           case "CreateBenefit":
+            return polar.createBenefit(
+              action.payload as unknown as Parameters<typeof polar.createBenefit>[0],
+            );
+
           case "UpdateBenefit":
+            return polar.updateBenefit(
+              action.id,
+              action.payload as Parameters<typeof polar.updateBenefit>[1],
+            );
+
           case "DeleteBenefit":
-            return Effect.die(new Error("Benefit operation execution is not implemented yet."));
+            return polar.deleteBenefit(action.id);
 
           case "CreateProduct":
             return polar.createProduct(
@@ -140,7 +149,7 @@ export class Executor extends Context.Service<
             return polar.archiveProduct(action.id);
 
           case "UpdateProductBenefits":
-            return Effect.die(new Error("Product Benefit operation execution is not implemented yet."));
+            return polar.updateProductBenefits(action.id, action.payload.benefits);
         }
       };
 
