@@ -21,6 +21,7 @@ const currentFromDesired = (
   key: desired.key,
   address: desired.address,
   polarId: `polar-${desired.key}`,
+  isArchived: false,
   spec,
 });
 

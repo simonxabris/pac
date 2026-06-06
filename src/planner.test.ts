@@ -190,6 +190,7 @@ describe("Planner.plan", () => {
         key: desired.key,
         address: desired.address,
         polarId: "polar-meter-requests",
+        isArchived: false,
         spec: desired.spec,
       };
       const planner = yield* Planner;
@@ -269,6 +270,7 @@ describe("Planner.plan", () => {
         key: meter.key,
         address: meter.address,
         polarId: "polar-meter-requests",
+        isArchived: false,
         spec: meter.spec,
       };
       const planner = yield* Planner;
@@ -446,6 +448,50 @@ describe("Planner.plan", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
+  it.effect("ignores archived current resources absent from desired", () =>
+    Effect.gen(function*() {
+      const product = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "20", currency: "usd" })],
+      }).toDesiredResource();
+      const meter = new Meter("requests", {
+        name: "Requests",
+        filter: { conjunction: "and", clauses: [] },
+        aggregation: count(),
+      }).toDesiredResource();
+      const archivedCurrentMeter: CurrentMeterResource = {
+        source: "current",
+        kind: "meter",
+        key: meter.key,
+        address: meter.address,
+        polarId: "polar-meter-requests",
+        isArchived: true,
+        spec: meter.spec,
+      };
+      const planner = yield* Planner;
+
+      const plan = yield* planner.plan({
+        desiredResources: [product],
+        currentResources: [archivedCurrentMeter],
+      });
+
+      expect([...plan.nodes.entries()]).toEqual([
+        [
+          "product.pro",
+          {
+            _tag: "Create",
+            address: "product.pro",
+            kind: "product",
+            desired: product,
+          },
+        ],
+      ]);
+      expect(plan.nodes.has("meter.requests")).toBe(false);
+      expect([...plan.nodes.values()].some((node) => node._tag === "Archive")).toBe(false);
+      expect(plan.edges).toEqual([]);
+    }).pipe(Effect.provide(testLayer)),
+  );
+
   it.effect("captures dependencies from current resources for archive ordering", () =>
     Effect.gen(function*() {
       const meter = new Meter("requests", {
@@ -463,6 +509,7 @@ describe("Planner.plan", () => {
         key: meter.key,
         address: meter.address,
         polarId: "polar-meter-requests",
+        isArchived: false,
         spec: meter.spec,
       };
       const currentProduct: CurrentProductResource = currentProductResource({

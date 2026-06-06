@@ -106,6 +106,7 @@ const RemoteProductSdk = Schema.Struct({
     ]),
   ),
   recurringIntervalCount: Schema.NullOr(Schema.Number),
+  isArchived: Schema.Boolean,
   metadata: MetadataRecord,
   prices: Schema.Array(RemoteProductPrice),
 });
@@ -124,6 +125,7 @@ const RemoteMeterSdk = Schema.Struct({
   filter: MeterFilterSpecSchema,
   aggregation: MeterAggregationSpecSchema,
   metadata: MetadataRecord,
+  archivedAt: Schema.optionalKey(Schema.NullOr(Schema.Date)),
 });
 
 const schemaIssue = (actual: unknown, message: string): SchemaIssue.Issue =>
@@ -227,6 +229,7 @@ const productToCurrentResource = ({
     key: identity.key,
     address: identity.address as `product.${string}`,
     polarId: product.id,
+    isArchived: product.isArchived,
     spec: {
       name: product.name,
       description: product.description,
@@ -256,6 +259,7 @@ const productResourceToRemoteInput = (
     visibility: resource.spec.visibility,
     recurringInterval: resource.spec.recurringInterval,
     recurringIntervalCount: resource.spec.recurringIntervalCount,
+    isArchived: resource.isArchived,
     metadata: {},
     prices: resource.spec.prices.map((price, index) => {
       const providerPrice = resource.providerState.prices[index];
@@ -308,6 +312,7 @@ const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeter
     key: identity.key,
     address: identity.address as `meter.${string}`,
     polarId: meter.id,
+    isArchived: meter.archivedAt != null,
     spec: {
       name: meter.name,
       unit: meter.unit,

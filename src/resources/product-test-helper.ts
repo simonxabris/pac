@@ -21,18 +21,21 @@ export const currentProductResource = ({
   polarId = `polar-${desired.key}`,
   priceIds,
   providerState = currentProductProviderState(spec, priceIds),
+  isArchived = false,
 }: {
   readonly desired: ProductResource;
   readonly spec?: ProductSpec;
   readonly polarId?: string;
   readonly priceIds?: ReadonlyArray<string>;
   readonly providerState?: CurrentProductProviderState;
+  readonly isArchived?: boolean;
 }): CurrentProductResource => ({
   source: "current",
   kind: "product",
   key: desired.key,
   address: desired.address,
   polarId,
+  isArchived,
   spec,
   providerState,
 });

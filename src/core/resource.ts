@@ -27,6 +27,7 @@ export type CurrentResource<
   ProviderState = unknown,
 > = ResourceEnvelope<"current", Kind, Spec> & {
   readonly polarId: string;
+  readonly isArchived: boolean;
   readonly providerState?: ProviderState;
   readonly raw?: unknown;
 };

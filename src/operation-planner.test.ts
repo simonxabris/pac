@@ -48,6 +48,7 @@ const makeCurrentResource = <K extends ResourceKind, S>(
   key,
   address: `${kind}.${key}` as ResourceAddress<K>,
   polarId,
+  isArchived: false,
   spec,
 });
 

@@ -193,6 +193,7 @@ export const CurrentProductResourceSchema = Schema.Struct({
   key: Schema.String,
   address: ProductAddressSchema,
   polarId: Schema.String,
+  isArchived: Schema.Boolean,
   spec: ProductSpecSchema,
   providerState: CurrentProductProviderStateSchema,
   raw: Schema.optionalKey(Schema.Unknown),

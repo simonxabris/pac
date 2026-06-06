@@ -331,6 +331,10 @@ export class Planner extends Context.Service<
                 continue;
               }
 
+              if (currentResource.isArchived) {
+                continue;
+              }
+
               const adapter = yield* adapterRegistry.get(currentResource.kind);
               const dependencies = yield* adapter.dependencies(currentResource);
 
