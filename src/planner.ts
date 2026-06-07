@@ -196,6 +196,33 @@ export class DuplicateCurrentResourceAddress extends Schema.TaggedErrorClass<Dup
   },
 ) { }
 
+export class PlanNotUpToDate extends Schema.TaggedErrorClass<PlanNotUpToDate>()(
+  "PlanNotUpToDate",
+  {
+    nodeCount: Schema.Number,
+    diagnosticCount: Schema.Number,
+    message: Schema.String,
+  },
+) { }
+
+const assertPlanUpToDate = (plan: Plan): Effect.Effect<void, PlanNotUpToDate> => {
+  const nonNoopNodes = [...plan.nodes.values()].filter((node) => node._tag !== "Noop");
+  const errorDiagnostics = plan.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+  if (nonNoopNodes.length === 0 && errorDiagnostics.length === 0) {
+    return Effect.void;
+  }
+
+  return Effect.fail(
+    new PlanNotUpToDate({
+      nodeCount: nonNoopNodes.length,
+      diagnosticCount: errorDiagnostics.length,
+      message:
+        "Cannot continue because the PAAC config is not fully in sync with Polar.",
+    }),
+  );
+};
+
 export const indexDesiredResources = (
   desiredResources: ReadonlyArray<DesiredResource>,
 ): Effect.Effect<DesiredResourceMap, DuplicateDesiredResourceAddress> =>
@@ -242,6 +269,7 @@ export class Planner extends Context.Service<
       | MissingResourceAdapter
       | ResourceAdapterPlanError
     >;
+    readonly assertPlanUpToDate: (plan: Plan) => Effect.Effect<void, PlanNotUpToDate>;
   }
 >()("@app/Planner") {
   static readonly layer = Layer.effect(
@@ -250,6 +278,7 @@ export class Planner extends Context.Service<
       const adapterRegistry = yield* ResourceAdapterRegistry;
 
       return Planner.of({
+        assertPlanUpToDate,
         plan: ({ desiredResources, currentResources }) =>
           Effect.gen(function*() {
             const desiredResourcesByAddress = yield* indexDesiredResources(desiredResources);
