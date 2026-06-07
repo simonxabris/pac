@@ -1,0 +1,11 @@
+onlyBuiltDependencies:
+  - esbuild
+
+ignoredBuiltDependencies:
+  - msgpackr-extract
+  - protobufjs
+
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: false
+  protobufjs: false
