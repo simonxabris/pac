@@ -5,6 +5,7 @@
   "keywords": [],
   "license": "ISC",
   "author": "",
+  "packageManager": "pnpm@11.5.2",
   "bin": {
     "paac": "./dist/cli.js"
   },
