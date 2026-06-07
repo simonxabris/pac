@@ -44,6 +44,17 @@ export const pro = new Product("pro", {
 
 run the `deploy` command to create the resources.
 
+# Authentication
+
+Set the following environment variable to authenticate with Polar:
+
+- `POLAR_ACCESS_TOKEN` — your Polar API access token.
+
+You can also set `POLAR_ENV` to choose which environment to connect to:
+
+- `production` — connects to the live Polar API.
+- `sandbox` — connects to the Polar sandbox API.
+
 # Supported
 
 - Product with all supported pricing strategies
