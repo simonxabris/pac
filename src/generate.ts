@@ -144,20 +144,55 @@ const sanitizeResourceRaw = (
       }),
   });
 
-const stringifyRawResource = (
+const renderJsValue = (value: unknown, level = 0): string => {
+  const currentIndent = "  ".repeat(level);
+  const nextIndent = "  ".repeat(level + 1);
+
+  if (value === null) return "null";
+
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "number") return JSON.stringify(value);
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+
+    return [
+      "[",
+      ...value.map((entry) => `${nextIndent}${renderJsValue(entry, level + 1)},`),
+      `${currentIndent}]`,
+    ].join("\n");
+  }
+
+  if (isRecord(value)) {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return "{}";
+
+    return [
+      "{",
+      ...entries.map(
+        ([key, entryValue]) =>
+          `${nextIndent}${renderPropertyKey(key)}: ${renderJsValue(entryValue, level + 1)},`,
+      ),
+      `${currentIndent}}`,
+    ].join("\n");
+  }
+
+  const rendered = JSON.stringify(value);
+  if (rendered === undefined) {
+    throw new Error("Raw Polar API response is not JSON-serializable.");
+  }
+  return rendered;
+};
+
+const renderRawResource = (
   resource: CurrentResource,
 ): Effect.Effect<string, CodeGenerationError> =>
   Effect.gen(function*() {
     const raw = yield* sanitizeResourceRaw(resource);
 
     return yield* Effect.try({
-      try: () => {
-        const rendered = JSON.stringify(raw, null, 2);
-        if (rendered === undefined) {
-          throw new Error("Raw Polar API response is not JSON-serializable.");
-        }
-        return rendered;
-      },
+      try: () => renderJsValue(raw),
       catch: (cause) =>
         new CodeGenerationError({
           address: resource.address,
@@ -171,7 +206,7 @@ const renderResourceEntries = (
 ): Effect.Effect<ReadonlyArray<string>, CodeGenerationError> =>
   Effect.forEach(resources, (resource) =>
     Effect.gen(function*() {
-      const raw = yield* stringifyRawResource(resource);
+      const raw = yield* renderRawResource(resource);
       return `  ${renderPropertyKey(resource.key)}: ${indent(raw, 2).trimStart()},`;
     }),
   );
