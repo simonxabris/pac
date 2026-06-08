@@ -49,13 +49,15 @@ const updatePayload = (
       return { metadata } satisfies ProductUpdate;
     case "meter":
       return { metadata } satisfies MeterUpdate;
-    case "benefit": {
-      const type = resource.desired.spec.type === "meter-credit" ? "meter_credit" : "custom";
-      if (type === "meter_credit") {
-        return { type: "meter_credit", metadata } satisfies BenefitsUpdateBenefitUpdate;
+    case "benefit":
+      switch (resource.desired.spec.type) {
+        case "meter-credit":
+          return { type: "meter_credit", metadata } satisfies BenefitsUpdateBenefitUpdate;
+        case "custom":
+          return { type: "custom", metadata } satisfies BenefitsUpdateBenefitUpdate;
+        case "feature-flag":
+          return { type: "feature_flag", metadata } satisfies BenefitsUpdateBenefitUpdate;
       }
-      return { type: "custom", metadata } satisfies BenefitsUpdateBenefitUpdate;
-    }
   }
 };
 
