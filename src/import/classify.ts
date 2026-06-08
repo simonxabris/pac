@@ -6,7 +6,7 @@ import {
   MetadataRecord,
   type ManagedIdentity,
 } from "../remote-resource-fetcher.js";
-import { errorMessage } from "../utils.js";
+import { errorMessage, hasPaacMetadata } from "../utils.js";
 
 const ManagedIdentitySchema = Schema.Struct({
   version: Schema.Literal(1),
@@ -89,9 +89,6 @@ const reservedWords = new Set([
   "yield",
 ]);
 
-const hasPaacMetadataValue = (metadata: Readonly<Record<string, unknown>> | undefined): boolean =>
-  metadata?.paac !== undefined;
-
 const shortPolarIdSuffix = (polarId: string): string => {
   const suffix = polarId
     .toLowerCase()
@@ -142,7 +139,7 @@ const classifyImportResource = ({
     });
   }
 
-  if (!hasPaacMetadataValue(metadata)) {
+  if (!hasPaacMetadata({ metadata })) {
     return ImportResourceClassification.cases.Unmanaged.make({});
   }
 
@@ -169,6 +166,7 @@ const resourceAddress = (kind: ResourceKind, key: string): ResourceAddress =>
 
 export const assignImportIdentities = (
   inputs: ReadonlyArray<ImportIdentityInput>,
+  options: { readonly allowConflictingMetadata?: boolean } = {},
 ): Effect.Effect<ReadonlyArray<AssignedImportIdentity>, ImportClassificationError> =>
   Effect.gen(function* () {
     const classified = inputs.map((input) => ({
@@ -176,13 +174,14 @@ export const assignImportIdentities = (
       classification: classifyImportResource(input),
     }));
 
-    const isBlockingClassification = ImportResourceClassification.isAnyOf([
-      "ConflictingMetadata",
-      "Unsupported",
-    ]);
+    const isUnsupportedClassification = ImportResourceClassification.guards.Unsupported;
+    const isConflictingClassification = ImportResourceClassification.guards.ConflictingMetadata;
 
     for (const { input, classification } of classified) {
-      if (isBlockingClassification(classification)) {
+      if (
+        isUnsupportedClassification(classification) ||
+        (isConflictingClassification(classification) && !options.allowConflictingMetadata)
+      ) {
         return yield* new ImportClassificationError({
           kind: input.kind,
           polarId: input.polarId,
@@ -208,7 +207,10 @@ export const assignImportIdentities = (
         const managedKeys = managedKeysByKind.get(input.kind) ?? new Set<string>();
         managedKeys.add(classification.identity.key);
         managedKeysByKind.set(input.kind, managedKeys);
-      } else if (ImportResourceClassification.guards.Unmanaged(classification)) {
+      } else if (
+        ImportResourceClassification.guards.Unmanaged(classification) ||
+        ImportResourceClassification.guards.ConflictingMetadata(classification)
+      ) {
         const base = keyFromLabel(input.kind, input.label, input.polarId);
         const mapKey = `${input.kind}:${base}`;
         generatedBaseCounts.set(mapKey, (generatedBaseCounts.get(mapKey) ?? 0) + 1);
@@ -231,8 +233,15 @@ export const assignImportIdentities = (
             ? `${baseKey}-${shortPolarIdSuffix(input.polarId)}`
             : baseKey;
         },
+        ConflictingMetadata: () => {
+          const managedKeys = managedKeysByKind.get(input.kind) ?? new Set<string>();
+          const hasGeneratedCollision =
+            (generatedBaseCounts.get(`${input.kind}:${baseKey}`) ?? 0) > 1;
+          return managedKeys.has(baseKey) || hasGeneratedCollision
+            ? `${baseKey}-${shortPolarIdSuffix(input.polarId)}`
+            : baseKey;
+        },
         SkippedRemoved: () => baseKey,
-        ConflictingMetadata: () => baseKey,
         Unsupported: () => baseKey,
       });
       const address = resourceAddress(input.kind, key);

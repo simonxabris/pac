@@ -36,7 +36,7 @@ import {
   type ProductPriceSpec,
   type ProductSpec,
 } from "./resources/product.js";
-import { errorMessage } from "./utils.js";
+import { errorMessage, hasPaacMetadata } from "./utils.js";
 
 export type RemoteResourceMap = ReadonlyMap<ResourceAddress, CurrentResource>;
 
@@ -189,10 +189,6 @@ export const RemoteMeterSdk = Schema.Struct({
 
 const schemaIssue = (actual: unknown, message: string): SchemaIssue.Issue =>
   new SchemaIssue.InvalidValue(Option.some(actual), { message });
-
-export const hasPaacMetadata = (remote: {
-  readonly metadata?: Readonly<Record<string, unknown>>;
-}): boolean => remote.metadata?.paac !== undefined;
 
 export const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
   const value = metadata.paac;

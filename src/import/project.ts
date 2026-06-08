@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import type { ResourceAddress } from "../core/address.js";
 import type { ResourceKind } from "../core/kind.js";
 import type { DesiredResource } from "../core/resource.js";
@@ -17,6 +17,13 @@ import type { MeterAddress, MeterSpec } from "../resources/meter.js";
 import type { ProductSpec } from "../resources/product.js";
 import { errorMessage } from "../utils.js";
 import { assignImportIdentities, type AssignedImportIdentity } from "./classify.js";
+
+export type ImportSkippedResource = {
+  readonly kind: ResourceKind;
+  readonly polarId: string;
+  readonly label: string;
+  readonly reason: string;
+};
 
 type ImportResourceModel<
   Kind extends ResourceKind = ResourceKind,
@@ -44,13 +51,14 @@ type ImportProductResourceModel = ImportResourceModel<
   typeof RemoteProductSdk.Type
 >;
 
-type ImportModel = {
+export type ImportModel = {
   readonly meters: ReadonlyArray<ImportMeterResourceModel>;
   readonly benefits: ReadonlyArray<ImportBenefitResourceModel>;
   readonly products: ReadonlyArray<ImportProductResourceModel>;
   readonly resources: ReadonlyArray<
     ImportMeterResourceModel | ImportBenefitResourceModel | ImportProductResourceModel
   >;
+  readonly skipped: ReadonlyArray<ImportSkippedResource>;
 };
 
 export class ImportProjectionError extends Schema.TaggedErrorClass<ImportProjectionError>()(
@@ -59,6 +67,24 @@ export class ImportProjectionError extends Schema.TaggedErrorClass<ImportProject
     message: Schema.String,
   },
 ) {}
+
+const RemoteImportResourceInfo = Schema.Struct({
+  id: Schema.String,
+  name: Schema.optionalKey(Schema.String),
+  description: Schema.optionalKey(Schema.String),
+});
+
+const decodeRemoteImportResourceInfo = Schema.decodeUnknownOption(RemoteImportResourceInfo);
+
+const remoteInfo = (remote: unknown): typeof RemoteImportResourceInfo.Type =>
+  Option.getOrElse(decodeRemoteImportResourceInfo(remote), () => ({ id: "unknown" }));
+
+const remoteId = (remote: unknown): string => remoteInfo(remote).id;
+
+const remoteLabel = (remote: unknown): string => {
+  const info = remoteInfo(remote);
+  return info.name ?? info.description ?? info.id;
+};
 
 const decodeRemoteMeter = (meter: RemoteMeter) =>
   Schema.decodeUnknownEffect(RemoteMeterSdk)(meter).pipe(
@@ -98,50 +124,105 @@ const identityByPolarId = (
 const addressesByPolarId = <Kind extends ResourceKind>(
   resources: ReadonlyArray<ImportResourceModel<Kind>>,
 ): Readonly<Record<string, ResourceAddress<Kind>>> =>
-  Object.fromEntries(resources.map((resource) => [resource.polarId, resource.desired.address])) as Record<
-    string,
-    ResourceAddress<Kind>
-  >;
+  Object.fromEntries(
+    resources.map((resource) => [resource.polarId, resource.desired.address]),
+  ) as Record<string, ResourceAddress<Kind>>;
 
 const failProjection = (message: string): Effect.Effect<never, ImportProjectionError> =>
   Effect.fail(new ImportProjectionError({ message }));
 
+type BuildImportModelOptions = {
+  readonly inventory: PolarInventory;
+  readonly skipUnsupported?: boolean;
+  readonly force?: boolean;
+};
+
+const decodeSupportedResources = <A, B>(
+  resources: ReadonlyArray<A>,
+  decode: (resource: A) => Effect.Effect<B, ImportProjectionError>,
+  skipped: Array<ImportSkippedResource>,
+  input: {
+    readonly kind: ResourceKind;
+    readonly skipUnsupported: boolean;
+  },
+): Effect.Effect<ReadonlyArray<B>, ImportProjectionError> =>
+  Effect.forEach(resources, (resource) =>
+    decode(resource).pipe(
+      Effect.map((decoded) => [decoded] as ReadonlyArray<B>),
+      Effect.catchIf(
+        () => input.skipUnsupported,
+        (error) => {
+          skipped.push({
+            kind: input.kind,
+            polarId: remoteId(resource),
+            label: remoteLabel(resource),
+            reason: error.message,
+          });
+          return Effect.succeed([] as ReadonlyArray<B>);
+        },
+      ),
+    ),
+  ).pipe(Effect.map((chunks) => chunks.flat()));
+
 export const buildImportModel = ({
   inventory,
-}: {
-  readonly inventory: PolarInventory;
-}): Effect.Effect<ImportModel, ImportProjectionError> =>
+  skipUnsupported = false,
+  force = false,
+}: BuildImportModelOptions): Effect.Effect<ImportModel, ImportProjectionError> =>
   Effect.gen(function* () {
-    const meters = yield* Effect.forEach(inventory.meters, decodeRemoteMeter);
-    const benefits = yield* Effect.forEach(inventory.benefits, decodeRemoteBenefit);
-    const products = yield* Effect.forEach(inventory.products, decodeRemoteProduct);
+    const skipped: Array<ImportSkippedResource> = [];
+    const meters = yield* decodeSupportedResources(inventory.meters, decodeRemoteMeter, skipped, {
+      kind: "meter",
+      skipUnsupported,
+    });
+    const benefits = yield* decodeSupportedResources(
+      inventory.benefits,
+      decodeRemoteBenefit,
+      skipped,
+      {
+        kind: "benefit",
+        skipUnsupported,
+      },
+    );
+    const products = yield* decodeSupportedResources(
+      inventory.products,
+      decodeRemoteProduct,
+      skipped,
+      {
+        kind: "product",
+        skipUnsupported,
+      },
+    );
 
-    const identities = yield* assignImportIdentities([
-      ...meters.map((meter) => ({
-        kind: "meter" as const,
-        polarId: meter.id,
-        label: meter.name,
-        metadata: meter.metadata,
-        isRemoved: meter.archivedAt != null,
-        supported: true,
-      })),
-      ...benefits.map((benefit) => ({
-        kind: "benefit" as const,
-        polarId: benefit.id,
-        label: benefit.description,
-        metadata: benefit.metadata,
-        isRemoved: benefit.isDeleted,
-        supported: true,
-      })),
-      ...products.map((product) => ({
-        kind: "product" as const,
-        polarId: product.id,
-        label: product.name,
-        metadata: product.metadata,
-        isRemoved: product.isArchived,
-        supported: true,
-      })),
-    ]).pipe(
+    const identities = yield* assignImportIdentities(
+      [
+        ...meters.map((meter) => ({
+          kind: "meter" as const,
+          polarId: meter.id,
+          label: meter.name,
+          metadata: meter.metadata,
+          isRemoved: meter.archivedAt != null,
+          supported: true,
+        })),
+        ...benefits.map((benefit) => ({
+          kind: "benefit" as const,
+          polarId: benefit.id,
+          label: benefit.description,
+          metadata: benefit.metadata,
+          isRemoved: benefit.isDeleted,
+          supported: true,
+        })),
+        ...products.map((product) => ({
+          kind: "product" as const,
+          polarId: product.id,
+          label: product.name,
+          metadata: product.metadata,
+          isRemoved: product.isArchived,
+          supported: true,
+        })),
+      ],
+      { allowConflictingMetadata: force },
+    ).pipe(
       Effect.mapError(
         (cause) =>
           new ImportProjectionError({
@@ -250,5 +331,6 @@ export const buildImportModel = ({
       benefits: benefitModels,
       products: productModels,
       resources: [...meterModels, ...benefitModels, ...productModels],
+      skipped,
     };
   });

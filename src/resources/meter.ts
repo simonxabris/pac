@@ -8,15 +8,7 @@ export type MeterAddress = ResourceAddress<MeterKind>;
 export const MeterAddressSchema = Schema.TemplateLiteral(["meter.", Schema.String]);
 
 export type MeterFilterConjunction = "and" | "or";
-export type MeterFilterOperator =
-  | "eq"
-  | "ne"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "like"
-  | "not_like";
+export type MeterFilterOperator = "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "like" | "not_like";
 export type MeterFilterValue = string | number | boolean;
 export type MeterTimestampFilterValue = string | number | Date;
 
@@ -40,14 +32,17 @@ export type AggregationFunction =
   | UniqueAggregationFunction;
 
 export type CountAggregation = { readonly func: "count" };
-export type PropertyAggregation = { readonly func: PropertyAggregationFunction; readonly property: string };
+export type PropertyAggregation = {
+  readonly func: PropertyAggregationFunction;
+  readonly property: string;
+};
 export type UniqueAggregation = { readonly func: "unique"; readonly property: string };
 export type MeterAggregation = CountAggregation | PropertyAggregation | UniqueAggregation;
 
 export type MeterConfig = {
   readonly name: string;
   readonly unit?: "scalar" | "token" | "custom";
-  readonly customLabel?: string;
+  readonly customLabel?: string | null;
   readonly customMultiplier?: number | null;
   readonly filter: MeterFilter;
   readonly aggregation: MeterAggregation;
@@ -100,7 +95,12 @@ export const MeterFilterSpecSchema: Schema.Codec<MeterFilterSpec> = Schema.suspe
 export const MeterAggregationSpecSchema: Schema.Codec<MeterAggregationSpec> = Schema.Union([
   Schema.Struct({ func: Schema.Literal("count") }),
   Schema.Struct({
-    func: Schema.Union([Schema.Literal("sum"), Schema.Literal("max"), Schema.Literal("min"), Schema.Literal("avg")]),
+    func: Schema.Union([
+      Schema.Literal("sum"),
+      Schema.Literal("max"),
+      Schema.Literal("min"),
+      Schema.Literal("avg"),
+    ]),
     property: Schema.String,
   }),
   Schema.Struct({ func: Schema.Literal("unique"), property: Schema.String }),
@@ -162,11 +162,15 @@ export const metadata = (
   value: MeterFilterValue,
 ): MeterFilterClause => ({ property: `metadata.${property}`, operator, value });
 
-export const and = (...clauses: ReadonlyArray<MeterFilterClause | MeterFilter>): MeterFilter =>
-  ({ conjunction: "and", clauses });
+export const and = (...clauses: ReadonlyArray<MeterFilterClause | MeterFilter>): MeterFilter => ({
+  conjunction: "and",
+  clauses,
+});
 
-export const or = (...clauses: ReadonlyArray<MeterFilterClause | MeterFilter>): MeterFilter =>
-  ({ conjunction: "or", clauses });
+export const or = (...clauses: ReadonlyArray<MeterFilterClause | MeterFilter>): MeterFilter => ({
+  conjunction: "or",
+  clauses,
+});
 
 export function aggregate(func: CountAggregationFunction): CountAggregation;
 export function aggregate(func: PropertyAggregationFunction, property: string): PropertyAggregation;

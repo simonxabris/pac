@@ -59,7 +59,7 @@ export type ProductConfig = {
   readonly benefits?: ReadonlyArray<BenefitReference>;
   readonly visibility?: "draft" | "private" | "public";
   readonly recurringInterval?: "day" | "week" | "month" | "year" | null;
-  readonly recurringIntervalCount?: number;
+  readonly recurringIntervalCount?: number | null;
 };
 
 export type ProductFixedPriceSpec = {
