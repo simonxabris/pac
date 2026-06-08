@@ -36,10 +36,15 @@ export const e2eOrganizationFromEnv = (): PolarE2EOrganization => {
     process.env.POLAR_SERVER_URL ??
     persisted?.apiUrl ??
     defaultPolarApiUrl;
-  const accessToken = process.env.PAAC_E2E_POLAR_ACCESS_TOKEN ?? process.env.POLAR_ACCESS_TOKEN ?? persisted?.accessToken;
+  const accessToken =
+    process.env.PAAC_E2E_POLAR_ACCESS_TOKEN ??
+    process.env.POLAR_ACCESS_TOKEN ??
+    persisted?.accessToken;
 
   if (accessToken === undefined || accessToken === "") {
-    throw new Error(`Missing E2E Polar access token. Run the Vitest global setup or set PAAC_E2E_POLAR_ACCESS_TOKEN.`);
+    throw new Error(
+      `Missing E2E Polar access token. Run the Vitest global setup or set PAAC_E2E_POLAR_ACCESS_TOKEN.`,
+    );
   }
 
   return {

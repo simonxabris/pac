@@ -6,7 +6,7 @@ type RemoteWithMetadata = {
   readonly metadata?: Readonly<Record<string, unknown>>;
 };
 
-const paacMetadata = (kind: "product" | "meter", key: string): string =>
+export const paacMetadata = (kind: "product" | "meter", key: string): string =>
   JSON.stringify({
     v: 1,
     kind,
@@ -36,10 +36,20 @@ export const listProducts = async (org: PolarE2EOrganization): Promise<Array<Rem
   return products;
 };
 
+export const getProductById = async (
+  org: PolarE2EOrganization,
+  id: string,
+): Promise<RemoteProduct> => polarSdk(org).products.get({ id });
+
+export const findProductsByKey = async (
+  org: PolarE2EOrganization,
+  key: string,
+): Promise<Array<RemoteProduct>> => {
+  const products = await listProducts(org);
+  return products.filter((product) => hasPaacAddress(product, "product", key));
+};
+
 export const findProductByKey = async (
   org: PolarE2EOrganization,
   key: string,
-): Promise<RemoteProduct | undefined> => {
-  const products = await listProducts(org);
-  return products.find((product) => hasPaacAddress(product, "product", key));
-};
+): Promise<RemoteProduct | undefined> => (await findProductsByKey(org, key))[0];

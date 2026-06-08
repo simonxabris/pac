@@ -1,14 +1,16 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
-export const deployConfig = async (
-  configPath: string,
-  env: NodeJS.ProcessEnv,
-): Promise<void> =>
+export const deployConfig = async (configPath: string, env: NodeJS.ProcessEnv): Promise<void> =>
   new Promise((resolveDeploy, reject) => {
     const child = spawn(
       process.execPath,
-      [resolve(process.cwd(), "dist/cli.js"), "deploy", "--config", resolve(process.cwd(), configPath)],
+      [
+        resolve(process.cwd(), "dist/cli.js"),
+        "deploy",
+        "--config",
+        resolve(process.cwd(), configPath),
+      ],
       {
         cwd: process.cwd(),
         env,
