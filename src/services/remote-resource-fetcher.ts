@@ -7,12 +7,12 @@ import {
   polarDecimalMinorUnitAmount,
   polarIntegerMinorUnitAmount,
   polarIntegerMinorUnitNumber,
-} from "./currency//currency.js";
-import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
-import { PAAC_METADATA_KEY } from "./core/metadata.js";
-import type { CurrentResource } from "./core/resource.js";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./polar/client.js";
-import { PolarClient } from "./polar/service.js";
+} from "../currency/currency.js";
+import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import type { CurrentResource } from "../core/resource.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
+import { PolarClient } from "./polar-client.js";
 import {
   BenefitSpecSchema,
   CurrentBenefitResourceSchema,
@@ -20,7 +20,7 @@ import {
   type BenefitAddress,
   type BenefitSpec,
   type CurrentBenefitResource,
-} from "./resources/benefit.js";
+} from "../resources/benefit.js";
 import {
   CurrentMeterResourceSchema,
   MeterAddressSchema,
@@ -30,15 +30,15 @@ import {
   type CurrentMeterResource,
   type MeterAddress,
   type MeterSpec,
-} from "./resources/meter.js";
+} from "../resources/meter.js";
 import {
   CurrentProductResourceSchema,
   ProductSpecSchema,
   type CurrentProductResource,
   type ProductPriceSpec,
   type ProductSpec,
-} from "./resources/product.js";
-import { errorMessage, hasPaacMetadata } from "./utils.js";
+} from "../resources/product.js";
+import { errorMessage, hasPaacMetadata } from "../utils.js";
 
 export type RemoteResourceMap = ReadonlyMap<ResourceAddress, CurrentResource>;
 

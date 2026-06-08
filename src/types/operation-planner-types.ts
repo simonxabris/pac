@@ -1,5 +1,5 @@
 import type { ResourceAddress } from "../core/address.js";
-import type { CreatePlanNode, RemovePlanNode, UpdatePlanNode } from "../planner.js";
+import type { CreatePlanNode, RemovePlanNode, UpdatePlanNode } from "../services/planner.js";
 import type { ResourceBindings } from "../operations/bindings.js";
 import type { Operation } from "../operations/operation.js";
 

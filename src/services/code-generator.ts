@@ -4,20 +4,20 @@ import {
   minorToMajorUnitAmount,
   optionalMinorToMajorUnitAmount,
   type CurrencyAmountInput,
-} from "./currency/currency.js";
-import type { ResourceKind } from "./core/kind.js";
-import { PAAC_METADATA_KEY } from "./core/metadata.js";
-import type { CurrentResource } from "./core/resource.js";
-import type { ImportModel } from "./import/project.js";
+} from "../currency/currency.js";
+import type { ResourceKind } from "../core/kind.js";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import type { CurrentResource } from "../core/resource.js";
+import type { ImportModel } from "../import/project.js";
 import type { Plan } from "./planner.js";
-import type { BenefitSpec } from "./resources/benefit.js";
+import type { BenefitSpec } from "../resources/benefit.js";
 import type {
   MeterAggregationSpec,
   MeterFilterClauseSpec,
   MeterFilterSpec,
   MeterSpec,
-} from "./resources/meter.js";
-import type { ProductPriceSpec, ProductSpec } from "./resources/product.js";
+} from "../resources/meter.js";
+import type { ProductPriceSpec, ProductSpec } from "../resources/product.js";
 
 export class CodeGenerationError extends Schema.TaggedErrorClass<CodeGenerationError>()(
   "CodeGenerationError",

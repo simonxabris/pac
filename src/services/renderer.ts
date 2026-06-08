@@ -1,6 +1,6 @@
 import { Console, Effect, Layer } from "effect";
 import * as Context from "effect/Context";
-import { formatMinorUnitAmount, type CurrencyAmountInput } from "./currency/currency.js";
+import { formatMinorUnitAmount, type CurrencyAmountInput } from "../currency/currency.js";
 import type { Diagnostic, FieldChange, Plan, PlanNode } from "./planner.js";
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

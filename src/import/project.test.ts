@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../polar/client.js";
-import type { PolarInventory } from "../remote-resource-fetcher.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
+import type { PolarInventory } from "../services/remote-resource-fetcher.js";
 import { managedMetadata } from "../resources/adapter-utils.js";
 import { buildImportModel } from "./project.js";
 

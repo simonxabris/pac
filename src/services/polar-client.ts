@@ -8,9 +8,9 @@ import type { ProductUpdate } from "@polar-sh/sdk/models/components/productupdat
 import type { BenefitsUpdateBenefitUpdate } from "@polar-sh/sdk/models/operations/benefitsupdate.js";
 import { Effect, Layer, Redacted, Schema } from "effect";
 import * as Context from "effect/Context";
-import { AppConfig } from "../config/service.js";
+import { AppConfig } from "./app-config.js";
 import { errorMessage } from "../utils.js";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./client.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
 
 export type PolarClientShape = {
   readonly listBenefits: () => Effect.Effect<ReadonlyArray<RemoteBenefit>, PolarClientError>;

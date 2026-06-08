@@ -1,14 +1,14 @@
 import { Effect, Exit, Layer, Schema } from "effect";
 import * as Context from "effect/Context";
-import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
-import type { OperationProgram } from "./operation-planner/types.js";
-import type { OperationAction } from "./operations/actions.js";
-import type { ResourceBinding } from "./operations/bindings.js";
-import type { Operation } from "./operations/operation.js";
-import type { OperationRef } from "./operations/ref.js";
-import { PolarClient, PolarClientError } from "./polar/service.js";
+import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
+import type { OperationProgram } from "../types/operation-planner-types.js";
+import type { OperationAction } from "../operations/actions.js";
+import type { ResourceBinding } from "../operations/bindings.js";
+import type { Operation } from "../operations/operation.js";
+import type { OperationRef } from "../operations/ref.js";
+import { PolarClient, PolarClientError } from "./polar-client.js";
 
-export type { ResourceBinding, ResourceBindings } from "./operations/bindings.js";
+export type { ResourceBinding, ResourceBindings } from "../operations/bindings.js";
 
 export class ExecutorRefResolutionError extends Schema.TaggedErrorClass<ExecutorRefResolutionError>()(
   "ExecutorRefResolutionError",

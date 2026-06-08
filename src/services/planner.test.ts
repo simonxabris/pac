@@ -3,17 +3,17 @@ import { Effect, Layer } from "effect";
 import { Planner } from "./planner.js";
 import { ResourceAdapterRegistryLive } from "./resource-adapters.js";
 import { eraseResourceAdapter, makeResourceAdapterRegistryLayer } from "./resource-adapter-registry.js";
-import { count, Meter, type CurrentMeterResource } from "./resources/meter.js";
-import { MeterResourceAdapter } from "./resources/meter-adapter.js";
+import { count, Meter, type CurrentMeterResource } from "../resources/meter.js";
+import { MeterResourceAdapter } from "../resources/meter-adapter.js";
 import {
   fixedPrice,
   meteredUnitPrice,
   Product,
   type CurrentProductResource,
-} from "./resources/product.js";
-import { ProductResourceAdapter } from "./resources/product-adapter.js";
-import { currentProductResource } from "./resources/product-test-helper.js";
-import { resetRegistry } from "./resources/registry.js";
+} from "../resources/product.js";
+import { ProductResourceAdapter } from "../resources/product-adapter.js";
+import { currentProductResource } from "../resources/product-test-helper.js";
+import { resetRegistry } from "../resources/registry.js";
 
 const testLayer = Planner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive));
 const cyclicTestLayer = Planner.layer.pipe(

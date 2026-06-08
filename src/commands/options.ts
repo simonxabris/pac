@@ -1,0 +1,40 @@
+import * as Flag from "effect/unstable/cli/Flag";
+
+export const configFlag = Flag.string("config").pipe(
+  Flag.withDefault("paac.config.ts"),
+  Flag.withDescription("Path to the PAAC config file to load"),
+);
+
+export const allowDeleteFlag = Flag.boolean("allow-delete").pipe(
+  Flag.withDescription("Allow destructive delete-mode removals during deploy"),
+);
+
+export const generatePathFlag = Flag.string("path").pipe(
+  Flag.withDefault("."),
+  Flag.withDescription(
+    "Output directory or file path. Directories use the default file name pac.runtime.ts.",
+  ),
+);
+
+export const importPathFlag = Flag.string("path").pipe(
+  Flag.withDefault("paac.config.ts"),
+  Flag.withDescription("Output path for the generated PAAC config file"),
+);
+
+export const overwriteFlag = Flag.boolean("overwrite").pipe(
+  Flag.withDescription("Allow replacing an existing output file"),
+);
+
+export const dryRunFlag = Flag.boolean("dry-run").pipe(
+  Flag.withDescription(
+    "Print the generated config and adoption plan without writing or mutating Polar",
+  ),
+);
+
+export const skipUnsupportedFlag = Flag.boolean("skip-unsupported").pipe(
+  Flag.withDescription("Skip unsupported remote resources instead of failing the import"),
+);
+
+export const forceFlag = Flag.boolean("force").pipe(
+  Flag.withDescription("Overwrite conflicting existing PAAC Metadata"),
+);

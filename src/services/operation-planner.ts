@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema } from "effect";
 import * as Context from "effect/Context";
-import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
-import type { Operation } from "./operations/operation.js";
+import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
+import type { Operation } from "../operations/operation.js";
 import type { Plan, PlanNodeMap } from "./planner.js";
 import type {
   ExecutablePlanNode,
@@ -10,7 +10,7 @@ import type {
   OperationGroup,
   OperationId,
   OperationProgram,
-} from "./operation-planner/types.js";
+} from "../types/operation-planner-types.js";
 import {
   MissingResourceAdapter,
   ResourceAdapterPlanError,

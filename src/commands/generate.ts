@@ -3,20 +3,22 @@ import * as Context from "effect/Context";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
-import { ConfigLoader, type UserConfigLoadError } from "./config-loader.js";
-import { CodeGenerator, type CodeGenerationError } from "./generate.js";
+import * as Command from "effect/unstable/cli/Command";
+import { ConfigLoader, type UserConfigLoadError } from "../services/config-loader.js";
+import { CodeGenerator, type CodeGenerationError } from "../services/code-generator.js";
 import {
   DuplicateCurrentResourceAddress,
   DuplicateDesiredResourceAddress,
   Planner,
   PlanNotUpToDate,
-} from "./planner.js";
-import { MissingResourceAdapter, ResourceAdapterPlanError } from "./resource-adapter-registry.js";
+} from "../services/planner.js";
+import { MissingResourceAdapter, ResourceAdapterPlanError } from "../services/resource-adapter-registry.js";
 import {
   DuplicateRemoteResourceAddress,
   RemoteResourceFetcher,
   RemoteResourceFetchError,
-} from "./remote-resource-fetcher.js";
+} from "../services/remote-resource-fetcher.js";
+import { configFlag, generatePathFlag } from "./options.js";
 
 export const defaultRuntimeFileName = "pac.runtime.ts";
 
@@ -156,3 +158,13 @@ export class GenerateCommand extends Context.Service<
     }),
   );
 }
+
+export const generateCommand = Command.make(
+  "generate",
+  { config: configFlag, path: generatePathFlag },
+  ({ config, path }) =>
+    Effect.gen(function* () {
+      const generateCommand = yield* GenerateCommand;
+      yield* generateCommand.generate({ config, path });
+    }),
+).pipe(Command.withDescription("Generate a runtime data file from deployed Polar resources"));

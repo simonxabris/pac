@@ -3,16 +3,24 @@ import * as Context from "effect/Context";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
-import { ConfigLoader } from "./config-loader.js";
-import { CodeGenerator, type CodeGenerationError } from "./generate.js";
-import { ResourceAdopter, type ImportAdoptionError } from "./import/adopt.js";
+import * as Command from "effect/unstable/cli/Command";
+import { ConfigLoader } from "../services/config-loader.js";
+import { CodeGenerator, type CodeGenerationError } from "../services/code-generator.js";
+import { ResourceAdopter, type ImportAdoptionError } from "../services/resource-adopter.js";
 import {
   buildImportModel,
   type ImportModel,
   type ImportProjectionError,
-} from "./import/project.js";
-import { Planner } from "./planner.js";
-import { RemoteResourceFetcher, RemoteResourceFetchError } from "./remote-resource-fetcher.js";
+} from "../import/project.js";
+import { Planner } from "../services/planner.js";
+import { RemoteResourceFetcher, RemoteResourceFetchError } from "../services/remote-resource-fetcher.js";
+import {
+  dryRunFlag,
+  forceFlag,
+  importPathFlag,
+  overwriteFlag,
+  skipUnsupportedFlag,
+} from "./options.js";
 
 export type ImportCommandInput = {
   readonly path: string;
@@ -261,3 +269,19 @@ export class ImportCommand extends Context.Service<
     }),
   );
 }
+
+export const importCommand = Command.make(
+  "import",
+  {
+    path: importPathFlag,
+    overwrite: overwriteFlag,
+    dryRun: dryRunFlag,
+    skipUnsupported: skipUnsupportedFlag,
+    force: forceFlag,
+  },
+  ({ path, overwrite, dryRun, skipUnsupported, force }) =>
+    Effect.gen(function* () {
+      const command = yield* ImportCommand;
+      yield* command.run({ path, overwrite, dryRun, skipUnsupported, force });
+    }),
+).pipe(Command.withDescription("Import existing Polar resources into PAAC"));

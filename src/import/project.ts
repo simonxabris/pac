@@ -2,7 +2,7 @@ import { Effect, Option, Schema } from "effect";
 import type { ResourceAddress } from "../core/address.js";
 import type { ResourceKind } from "../core/kind.js";
 import type { DesiredResource } from "../core/resource.js";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../polar/client.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
 import {
   RemoteBenefitSdk,
   RemoteMeterSdk,
@@ -11,7 +11,7 @@ import {
   remoteMeterToSpec,
   remoteProductToSpec,
   type PolarInventory,
-} from "../remote-resource-fetcher.js";
+} from "../services/remote-resource-fetcher.js";
 import type { BenefitAddress, BenefitSpec } from "../resources/benefit.js";
 import type { MeterAddress, MeterSpec } from "../resources/meter.js";
 import type { ProductSpec } from "../resources/product.js";
