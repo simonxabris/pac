@@ -10,10 +10,13 @@ import {
 } from "./currency//currency.js";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
 import type { CurrentResource } from "./core/resource.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./polar/client.js";
 import { PolarClient } from "./polar/service.js";
 import {
+  BenefitSpecSchema,
   CurrentBenefitResourceSchema,
   type BenefitAddress,
+  type BenefitSpec,
   type CurrentBenefitResource,
 } from "./resources/benefit.js";
 import {
@@ -21,18 +24,29 @@ import {
   MeterAddressSchema,
   MeterAggregationSpecSchema,
   MeterFilterSpecSchema,
+  MeterSpecSchema,
   type CurrentMeterResource,
   type MeterAddress,
+  type MeterSpec,
 } from "./resources/meter.js";
 import {
   CurrentProductResourceSchema,
+  ProductSpecSchema,
   type CurrentProductResource,
   type ProductPriceSpec,
+  type ProductSpec,
 } from "./resources/product.js";
+import { errorMessage } from "./utils.js";
 
 export type RemoteResourceMap = ReadonlyMap<ResourceAddress, CurrentResource>;
 
-type ManagedIdentity = {
+export type PolarInventory = {
+  readonly products: ReadonlyArray<RemoteProduct>;
+  readonly meters: ReadonlyArray<RemoteMeter>;
+  readonly benefits: ReadonlyArray<RemoteBenefit>;
+};
+
+export type ManagedIdentity = {
   readonly version: 1;
   readonly kind: string;
   readonly address: ResourceAddress;
@@ -40,7 +54,7 @@ type ManagedIdentity = {
 };
 
 const MetadataValue = Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null]);
-const MetadataRecord = Schema.Record(Schema.String, MetadataValue);
+export const MetadataRecord = Schema.Record(Schema.String, MetadataValue);
 
 const ManagedIdentityEnvelope = Schema.Struct({
   v: Schema.Literal(1),
@@ -97,7 +111,7 @@ const RemoteProductBenefit = Schema.Struct({
   id: Schema.String,
 });
 
-const RemoteProductSdk = Schema.Struct({
+export const RemoteProductSdk = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.NullOr(Schema.String),
@@ -121,10 +135,13 @@ const RemoteProductSdk = Schema.Struct({
   benefits: Schema.Array(RemoteProductBenefit),
 });
 
-const RemoteProductResourceInput = Schema.Struct({
+export const RemoteProductResourceInput = Schema.Struct({
   product: RemoteProductSdk,
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
-  benefitAddressesById: Schema.Record(Schema.String, Schema.TemplateLiteral(["benefit.", Schema.String])),
+  benefitAddressesById: Schema.Record(
+    Schema.String,
+    Schema.TemplateLiteral(["benefit.", Schema.String]),
+  ),
 });
 
 const RemoteBenefitMeterCreditSdk = Schema.Struct({
@@ -151,14 +168,14 @@ const RemoteBenefitCustomSdk = Schema.Struct({
   }),
 });
 
-const RemoteBenefitSdk = Schema.Union([RemoteBenefitMeterCreditSdk, RemoteBenefitCustomSdk]);
+export const RemoteBenefitSdk = Schema.Union([RemoteBenefitMeterCreditSdk, RemoteBenefitCustomSdk]);
 
-const RemoteBenefitResourceInput = Schema.Struct({
+export const RemoteBenefitResourceInput = Schema.Struct({
   benefit: RemoteBenefitSdk,
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
 });
 
-const RemoteMeterSdk = Schema.Struct({
+export const RemoteMeterSdk = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   unit: Schema.Union([Schema.Literal("scalar"), Schema.Literal("token"), Schema.Literal("custom")]),
@@ -173,17 +190,11 @@ const RemoteMeterSdk = Schema.Struct({
 const schemaIssue = (actual: unknown, message: string): SchemaIssue.Issue =>
   new SchemaIssue.InvalidValue(Option.some(actual), { message });
 
-const errorMessage = (cause: unknown): string => {
-  if (cause instanceof Error) return cause.message;
-  if (typeof cause === "string") return cause;
-  return String(cause);
-};
-
-const hasPaacMetadata = (remote: {
+export const hasPaacMetadata = (remote: {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }): boolean => remote.metadata?.paac !== undefined;
 
-const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
+export const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
   const value = metadata.paac;
   if (typeof value !== "string") {
     throw new Error("Remote resource does not contain PAAC metadata.");
@@ -202,7 +213,7 @@ const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIden
   };
 };
 
-const identityForKind = (
+export const identityForKind = (
   kind: "product" | "meter" | "benefit",
   metadata: typeof MetadataRecord.Type,
 ): ManagedIdentity => {
@@ -257,23 +268,45 @@ const productPriceToSpec = (
   }
 };
 
-const productToCurrentResource = ({
+export const remoteProductToSpec = ({
   product,
   meterAddressesById,
   benefitAddressesById,
-}: typeof RemoteProductResourceInput.Type): CurrentProductResource => {
-  const identity = identityForKind("product", product.metadata);
+}: typeof RemoteProductResourceInput.Type): ProductSpec => {
   const activePrices = product.prices.filter((price) => !price.isArchived);
   const prices = activePrices.map((price) => productPriceToSpec(price, meterAddressesById));
+  const benefits = [
+    ...new Set(
+      product.benefits.flatMap((benefit) => {
+        const address = benefitAddressesById[benefit.id];
+        return address === undefined ? [] : [address];
+      }),
+    ),
+  ].sort() as ReadonlyArray<BenefitAddress>;
+
+  return Schema.decodeUnknownSync(ProductSpecSchema)({
+    name: product.name,
+    description: product.description,
+    prices,
+    benefits,
+    visibility: product.visibility,
+    recurringInterval: product.recurringInterval,
+    recurringIntervalCount:
+      product.recurringInterval === null ? null : (product.recurringIntervalCount ?? 1),
+  });
+};
+
+const productToCurrentResource = (
+  input: typeof RemoteProductResourceInput.Type,
+): CurrentProductResource => {
+  const { product, benefitAddressesById } = input;
+  const identity = identityForKind("product", product.metadata);
+  const activePrices = product.prices.filter((price) => !price.isArchived);
+  const spec = remoteProductToSpec(input);
   const attachedBenefits = product.benefits.map((benefit) => ({
     polarBenefitId: benefit.id,
     address: benefitAddressesById[benefit.id] ?? null,
   }));
-  const benefits = [
-    ...new Set(
-      attachedBenefits.flatMap((benefit) => benefit.address === null ? [] : [benefit.address]),
-    ),
-  ].sort() as ReadonlyArray<BenefitAddress>;
 
   return {
     source: "current",
@@ -282,20 +315,11 @@ const productToCurrentResource = ({
     address: identity.address as `product.${string}`,
     polarId: product.id,
     isRemoved: product.isArchived,
-    spec: {
-      name: product.name,
-      description: product.description,
-      prices,
-      benefits,
-      visibility: product.visibility,
-      recurringInterval: product.recurringInterval,
-      recurringIntervalCount:
-        product.recurringInterval === null ? null : (product.recurringIntervalCount ?? 1),
-    },
+    spec,
     providerState: {
       prices: activePrices.map((price, index) => ({
         polarPriceId: price.id,
-        spec: prices[index] as ProductPriceSpec,
+        spec: spec.prices[index] as ProductPriceSpec,
       })),
       benefits: attachedBenefits,
     },
@@ -362,22 +386,10 @@ const productResourceToRemoteInput = (
   benefitAddressesById: {},
 });
 
-const benefitToCurrentResource = ({
+export const remoteBenefitToSpec = ({
   benefit,
   meterAddressesById,
-}: typeof RemoteBenefitResourceInput.Type): CurrentBenefitResource => {
-  const identity = identityForKind("benefit", benefit.metadata);
-
-  const base = {
-    source: "current" as const,
-    kind: "benefit" as const,
-    key: identity.key,
-    address: identity.address as `benefit.${string}`,
-    polarId: benefit.id,
-    isRemoved: benefit.isDeleted,
-    raw: benefit,
-  };
-
+}: typeof RemoteBenefitResourceInput.Type): BenefitSpec => {
   switch (benefit.type) {
     case "meter_credit": {
       const meterAddress = meterAddressesById[benefit.properties.meterId];
@@ -387,27 +399,39 @@ const benefitToCurrentResource = ({
         );
       }
 
-      return {
-        ...base,
-        spec: {
-          type: "meter-credit",
-          description: benefit.description,
-          meter: meterAddress,
-          units: benefit.properties.units,
-          rollover: benefit.properties.rollover,
-        },
-      };
+      return Schema.decodeUnknownSync(BenefitSpecSchema)({
+        type: "meter-credit",
+        description: benefit.description,
+        meter: meterAddress,
+        units: benefit.properties.units,
+        rollover: benefit.properties.rollover,
+      });
     }
     case "custom":
-      return {
-        ...base,
-        spec: {
-          type: "custom",
-          description: benefit.description,
-          note: benefit.properties.note,
-        },
-      };
+      return Schema.decodeUnknownSync(BenefitSpecSchema)({
+        type: "custom",
+        description: benefit.description,
+        note: benefit.properties.note,
+      });
   }
+};
+
+const benefitToCurrentResource = (
+  input: typeof RemoteBenefitResourceInput.Type,
+): CurrentBenefitResource => {
+  const { benefit } = input;
+  const identity = identityForKind("benefit", benefit.metadata);
+
+  return {
+    source: "current",
+    kind: "benefit",
+    key: identity.key,
+    address: identity.address as `benefit.${string}`,
+    polarId: benefit.id,
+    isRemoved: benefit.isDeleted,
+    spec: remoteBenefitToSpec(input),
+    raw: benefit,
+  };
 };
 
 const benefitResourceToRemoteInput = (
@@ -445,6 +469,16 @@ const benefitResourceToRemoteInput = (
   }
 };
 
+export const remoteMeterToSpec = (meter: typeof RemoteMeterSdk.Type): MeterSpec =>
+  Schema.decodeUnknownSync(MeterSpecSchema)({
+    name: meter.name,
+    unit: meter.unit,
+    customLabel: meter.customLabel ?? null,
+    customMultiplier: meter.customMultiplier ?? null,
+    filter: meter.filter,
+    aggregation: meter.aggregation,
+  });
+
 const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeterResource => {
   const identity = identityForKind("meter", meter.metadata);
   return {
@@ -454,14 +488,7 @@ const meterToCurrentResource = (meter: typeof RemoteMeterSdk.Type): CurrentMeter
     address: identity.address as `meter.${string}`,
     polarId: meter.id,
     isRemoved: meter.archivedAt != null,
-    spec: {
-      name: meter.name,
-      unit: meter.unit,
-      customLabel: meter.customLabel ?? null,
-      customMultiplier: meter.customMultiplier ?? null,
-      filter: meter.filter,
-      aggregation: meter.aggregation,
-    },
+    spec: remoteMeterToSpec(meter),
     raw: meter,
   };
 };
@@ -525,18 +552,19 @@ export class RemoteResourceFetchError extends Schema.TaggedErrorClass<RemoteReso
   {
     message: Schema.String,
   },
-) { }
+) {}
 
 export class DuplicateRemoteResourceAddress extends Schema.TaggedErrorClass<DuplicateRemoteResourceAddress>()(
   "DuplicateRemoteResourceAddress",
   {
     address: ResourceAddressSchema,
   },
-) { }
+) {}
 
 export class RemoteResourceFetcher extends Context.Service<
   RemoteResourceFetcher,
   {
+    readonly fetchInventory: () => Effect.Effect<PolarInventory, RemoteResourceFetchError>;
     readonly fetch: () => Effect.Effect<
       RemoteResourceMap,
       RemoteResourceFetchError | DuplicateRemoteResourceAddress
@@ -545,23 +573,38 @@ export class RemoteResourceFetcher extends Context.Service<
 >()("@app/RemoteResourceFetcher") {
   static readonly layer = Layer.effect(
     RemoteResourceFetcher,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const polar = yield* PolarClient;
 
+      const fetchRawInventory = (): Effect.Effect<PolarInventory, RemoteResourceFetchError> =>
+        Effect.gen(function* () {
+          const [remoteProducts, remoteMeters, remoteBenefits] = yield* Effect.all(
+            [polar.listProducts(), polar.listMeters(), polar.listBenefits()] as const,
+            { concurrency: "unbounded" },
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new RemoteResourceFetchError({
+                  message: `Failed to fetch Polar resources: ${errorMessage(cause)}`,
+                }),
+            ),
+          );
+
+          return {
+            products: remoteProducts,
+            meters: remoteMeters,
+            benefits: remoteBenefits,
+          };
+        });
+
       return RemoteResourceFetcher.of({
+        fetchInventory: fetchRawInventory,
         fetch: () =>
-          Effect.gen(function*() {
-            const [remoteProducts, remoteMeters, remoteBenefits] = yield* Effect.all(
-              [polar.listProducts(), polar.listMeters(), polar.listBenefits()] as const,
-              { concurrency: "unbounded" },
-            ).pipe(
-              Effect.mapError(
-                (cause) =>
-                  new RemoteResourceFetchError({
-                    message: `Failed to fetch Polar resources: ${errorMessage(cause)}`,
-                  }),
-              ),
-            );
+          Effect.gen(function* () {
+            const inventory = yield* fetchRawInventory();
+            const remoteProducts = inventory.products;
+            const remoteMeters = inventory.meters;
+            const remoteBenefits = inventory.benefits;
 
             const meters = yield* Effect.forEach(
               remoteMeters.filter(hasPaacMetadata),
@@ -602,7 +645,11 @@ export class RemoteResourceFetcher extends Context.Service<
             const products = yield* Effect.forEach(
               remoteProducts.filter(hasPaacMetadata),
               (product) =>
-                decodeRemoteProductResource({ product, meterAddressesById, benefitAddressesById }).pipe(
+                decodeRemoteProductResource({
+                  product,
+                  meterAddressesById,
+                  benefitAddressesById,
+                }).pipe(
                   Effect.mapError(
                     (cause) =>
                       new RemoteResourceFetchError({
