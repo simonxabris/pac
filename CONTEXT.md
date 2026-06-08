@@ -68,6 +68,10 @@ _Avoid_: Product feature, embedded benefit
 A Benefit that grants units to a customer's Meter balance. Subscription Products grant the units each subscription cycle; one-time Products grant them once at purchase.
 _Avoid_: Credit balance, metered price, usage allowance
 
+**Feature Flag Benefit**:
+A Benefit that gates application functionality through Polar customer grants. Applications check Customer State or customer state webhooks for a grant of the Feature Flag Benefit; optional Benefit metadata carries application-specific context.
+_Avoid_: External flag, product feature, embedded entitlement
+
 **Product Benefit Attachment**:
 The authoritative set of Benefits granted by a Product. A Product depends on every attached Benefit.
 _Avoid_: Embedded benefit, benefit copy

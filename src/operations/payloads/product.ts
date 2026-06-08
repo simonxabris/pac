@@ -4,9 +4,13 @@ import type { ProductPriceFixedCreate } from "@polar-sh/sdk/models/components/pr
 import type { ProductPriceFreeCreate } from "@polar-sh/sdk/models/components/productpricefreecreate.js";
 import type { ProductPriceMeteredUnitCreate } from "@polar-sh/sdk/models/components/productpricemeteredunitcreate.js";
 import type { ProductUpdate } from "@polar-sh/sdk/models/components/productupdate.js";
+import { PAAC_METADATA_KEY } from "../../core/metadata.js";
 import type { Resolvable } from "../ref.js";
 
-export type ProductPriceMeteredUnitCreatePayload = Omit<ProductPriceMeteredUnitCreate, "meterId"> & {
+export type ProductPriceMeteredUnitCreatePayload = Omit<
+  ProductPriceMeteredUnitCreate,
+  "meterId"
+> & {
   readonly meterId: Resolvable<string>;
 };
 
@@ -17,20 +21,20 @@ export type ProductPriceCreatePayload =
   | ProductPriceMeteredUnitCreatePayload;
 
 export type ProductCreateOperationPayload = {
-  readonly metadata: { readonly paac: string };
+  readonly metadata: { readonly [PAAC_METADATA_KEY]: string };
   readonly name: string;
   readonly description: string | null;
   readonly visibility: "draft" | "private" | "public";
   readonly prices: ReadonlyArray<ProductPriceCreatePayload>;
 } & (
   | {
-    readonly recurringInterval: "day" | "week" | "month" | "year";
-    readonly recurringIntervalCount: number;
-  }
+      readonly recurringInterval: "day" | "week" | "month" | "year";
+      readonly recurringIntervalCount: number;
+    }
   | {
-    readonly recurringInterval: null;
-    readonly recurringIntervalCount: null;
-  }
+      readonly recurringInterval: null;
+      readonly recurringIntervalCount: null;
+    }
 );
 
 export type ProductUpdatePricePayload = ExistingProductPrice | ProductPriceCreatePayload;

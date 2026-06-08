@@ -7,18 +7,19 @@ export type {
   ResourceSource,
 } from "./core/resource.js";
 
-export {
-  Benefit,
-  benefitSpec,
-} from "./resources/benefit.js";
+export { Benefit, benefitSpec } from "./resources/benefit.js";
 export type {
   BenefitAddress,
   BenefitConfig,
+  BenefitFeatureFlagSpec,
   BenefitKind,
+  BenefitMetadata,
+  BenefitMetadataValue,
   BenefitMeterCreditSpec,
   BenefitResource,
   BenefitSpec,
   CurrentBenefitResource,
+  FeatureFlagBenefitConfig,
   MeterCreditBenefitConfig,
   MeterReference,
 } from "./resources/benefit.js";

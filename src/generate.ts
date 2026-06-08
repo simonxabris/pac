@@ -6,6 +6,7 @@ import {
   type CurrencyAmountInput,
 } from "./currency/currency.js";
 import type { ResourceKind } from "./core/kind.js";
+import { PAAC_METADATA_KEY } from "./core/metadata.js";
 import type { CurrentResource } from "./core/resource.js";
 import type { Plan } from "./planner.js";
 
@@ -15,7 +16,7 @@ export class CodeGenerationError extends Schema.TaggedErrorClass<CodeGenerationE
     address: Schema.optionalKey(Schema.String),
     message: Schema.String,
   },
-) { }
+) {}
 
 type RuntimeExportName = "products" | "meters" | "benefits";
 
@@ -41,7 +42,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
 
 const removePaacMetadata = (metadata: Record<string, unknown>): Record<string, unknown> => {
-  const { paac: _paac, ...rest } = metadata;
+  const { [PAAC_METADATA_KEY]: _paac, ...rest } = metadata;
   return rest;
 };
 
@@ -185,10 +186,8 @@ const renderJsValue = (value: unknown, level = 0): string => {
   return rendered;
 };
 
-const renderRawResource = (
-  resource: CurrentResource,
-): Effect.Effect<string, CodeGenerationError> =>
-  Effect.gen(function*() {
+const renderRawResource = (resource: CurrentResource): Effect.Effect<string, CodeGenerationError> =>
+  Effect.gen(function* () {
     const raw = yield* sanitizeResourceRaw(resource);
 
     return yield* Effect.try({
@@ -205,7 +204,7 @@ const renderResourceEntries = (
   resources: ReadonlyArray<CurrentResource>,
 ): Effect.Effect<ReadonlyArray<string>, CodeGenerationError> =>
   Effect.forEach(resources, (resource) =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const raw = yield* renderRawResource(resource);
       return `  ${renderPropertyKey(resource.key)}: ${indent(raw, 2).trimStart()},`;
     }),
@@ -215,7 +214,7 @@ const renderExport = (
   name: RuntimeExportName,
   resources: ReadonlyArray<CurrentResource>,
 ): Effect.Effect<string, CodeGenerationError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const entries = yield* renderResourceEntries(resources);
 
     if (entries.length === 0) {
@@ -250,7 +249,7 @@ const assertRenderableResources = (
   }).pipe(Effect.asVoid);
 
 const generate = (plan: Plan): Effect.Effect<string, CodeGenerationError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const resources = currentResourcesForGeneration(plan);
     yield* assertRenderableResources(resources);
 

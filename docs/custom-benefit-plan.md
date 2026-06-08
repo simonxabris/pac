@@ -41,7 +41,7 @@ Important behavior from Polar docs:
 - The customer-facing title is the Benefit `description`.
 - The private customer content is `properties.note`.
 - The note supports Markdown.
-- This type should not be positioned as PAAC's feature-gating primitive; Polar now recommends Feature Flag Benefits for that.
+- This type should not be positioned as PAAC's feature-gating primitive; use PAAC's `feature-flag` Benefit support for that.
 
 ## Existing Meter-Credit Support to Reuse
 
