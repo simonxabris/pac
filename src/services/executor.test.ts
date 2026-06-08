@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import { Executor } from "./executor.js";
-import type { OperationProgram } from "../operation-planner/types.js";
+import type { OperationProgram } from "../types/operation-planner-types.js";
 import type { OperationAction } from "../operations/actions.js";
 import type {
   BenefitCreateOperationPayload,
@@ -21,7 +21,7 @@ import type { PolarClientShape } from "./polar-client.js";
 import { PolarClient, PolarClientError } from "./polar-client.js";
 import type { ResourceAddress } from "../core/address.js";
 import type { ResourceKind } from "../core/kind.js";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../polar/client.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
 
 type PolarCall =
   | { readonly method: "createBenefit"; readonly payload: unknown }

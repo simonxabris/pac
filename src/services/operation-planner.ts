@@ -10,7 +10,7 @@ import type {
   OperationGroup,
   OperationId,
   OperationProgram,
-} from "../operation-planner/types.js";
+} from "../types/operation-planner-types.js";
 import {
   MissingResourceAdapter,
   ResourceAdapterPlanError,

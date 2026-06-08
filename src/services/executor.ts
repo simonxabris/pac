@@ -1,7 +1,7 @@
 import { Effect, Exit, Layer, Schema } from "effect";
 import * as Context from "effect/Context";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
-import type { OperationProgram } from "../operation-planner/types.js";
+import type { OperationProgram } from "../types/operation-planner-types.js";
 import type { OperationAction } from "../operations/actions.js";
 import type { ResourceBinding } from "../operations/bindings.js";
 import type { Operation } from "../operations/operation.js";

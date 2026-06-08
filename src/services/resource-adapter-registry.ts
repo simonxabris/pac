@@ -3,7 +3,7 @@ import * as Context from "effect/Context";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
 import { ResourceKindSchema, type ResourceKind } from "../core/kind.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
-import type { OperationId } from "../operation-planner/types.js";
+import type { OperationId } from "../types/operation-planner-types.js";
 import type { Operation } from "../operations/operation.js";
 import type {
   CreatePlanNode,

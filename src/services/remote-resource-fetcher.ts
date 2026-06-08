@@ -11,7 +11,7 @@ import {
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
 import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import type { CurrentResource } from "../core/resource.js";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../polar/client.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
 import { PolarClient } from "./polar-client.js";
 import {
   BenefitSpecSchema,
