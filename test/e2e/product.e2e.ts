@@ -3,9 +3,12 @@ import { deployConfig } from "./helpers/deploy.js";
 import { e2eOrganizationFromEnv } from "./helpers/env.js";
 import { findProductByKey } from "./helpers/polar.js";
 
-describe("paac deploy e2e", () => {
+describe("product e2e", () => {
   it("creates a product", async () => {
     const org = e2eOrganizationFromEnv();
+
+    const productBeforeDeploy = await findProductByKey(org, "starter");
+    expect(productBeforeDeploy).toBeUndefined();
 
     await deployConfig("test/e2e/cases/create-product/paac.config.ts", org.env);
 

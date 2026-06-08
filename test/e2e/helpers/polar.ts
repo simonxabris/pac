@@ -1,4 +1,5 @@
 import { Polar } from "@polar-sh/sdk";
+import type { Product as RemoteProduct } from "@polar-sh/sdk/models/components/product.js";
 import type { PolarE2EOrganization } from "./env.js";
 
 type RemoteWithMetadata = {
@@ -26,9 +27,9 @@ export const polarSdk = (org: PolarE2EOrganization): Polar =>
     serverURL: org.apiUrl,
   });
 
-export const listProducts = async (org: PolarE2EOrganization): Promise<Array<any>> => {
+export const listProducts = async (org: PolarE2EOrganization): Promise<Array<RemoteProduct>> => {
   const iterator = await polarSdk(org).products.list({ limit: 100 });
-  const products: Array<any> = [];
+  const products: Array<RemoteProduct> = [];
   for await (const page of iterator) {
     products.push(...page.result.items);
   }
@@ -38,7 +39,7 @@ export const listProducts = async (org: PolarE2EOrganization): Promise<Array<any
 export const findProductByKey = async (
   org: PolarE2EOrganization,
   key: string,
-): Promise<any | undefined> => {
+): Promise<RemoteProduct | undefined> => {
   const products = await listProducts(org);
   return products.find((product) => hasPaacAddress(product, "product", key));
 };
