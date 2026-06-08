@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import { MeterResourceAdapter } from "./meter-adapter.js";
 import {
   and,
@@ -31,7 +32,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
   });
 
   it.effect("creates a Polar-shaped create meter payload", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Meter("requests", {
         name: "Requests",
         unit: "custom",
@@ -61,7 +62,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
             _tag: "CreateMeter",
             payload: {
               metadata: {
-                paac: JSON.stringify({
+                [PAAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "meter",
                   addr: "meter.requests",
@@ -97,7 +98,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
   );
 
   it.effect("creates Polar-shaped update meter payloads and rollback payloads", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Meter("requests", {
         name: "Requests",
         unit: "custom",
@@ -127,8 +128,18 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
             { _tag: "FieldChange", path: ["unit"], before: "scalar", after: "custom" },
             { _tag: "FieldChange", path: ["customLabel"], before: null, after: "requests" },
             { _tag: "FieldChange", path: ["customMultiplier"], before: null, after: 1000 },
-            { _tag: "FieldChange", path: ["filter"], before: current.spec.filter, after: desired.spec.filter },
-            { _tag: "FieldChange", path: ["aggregation"], before: current.spec.aggregation, after: desired.spec.aggregation },
+            {
+              _tag: "FieldChange",
+              path: ["filter"],
+              before: current.spec.filter,
+              after: desired.spec.filter,
+            },
+            {
+              _tag: "FieldChange",
+              path: ["aggregation"],
+              before: current.spec.aggregation,
+              after: desired.spec.aggregation,
+            },
           ],
         },
         { nextOperationId: () => "op_1" },

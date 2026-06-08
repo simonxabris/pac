@@ -1,5 +1,6 @@
 import { Equal } from "effect";
 import type { ResourceKind } from "../core/kind.js";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import type { RollbackAction } from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
 import type { FieldChange } from "../planner.js";
@@ -14,11 +15,11 @@ export const fieldChange = (
   valuesEqual(before, after)
     ? undefined
     : {
-      _tag: "FieldChange",
-      path,
-      before,
-      after,
-    };
+        _tag: "FieldChange",
+        path,
+        before,
+        after,
+      };
 
 export const pushFieldChange = (
   changes: Array<FieldChange>,
@@ -43,8 +44,12 @@ export const unsupportedRollback = (reason: string): RollbackAction => ({
   reason,
 });
 
-export const managedMetadata = (kind: ResourceKind, address: OperationRef["address"], key: string) => ({
-  paac: JSON.stringify({
+export const managedMetadata = (
+  kind: ResourceKind,
+  address: OperationRef["address"],
+  key: string,
+) => ({
+  [PAAC_METADATA_KEY]: JSON.stringify({
     v: 1,
     kind,
     addr: address,

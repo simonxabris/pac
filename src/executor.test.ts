@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
+import { PAAC_METADATA_KEY } from "./core/metadata.js";
 import { Executor } from "./executor.js";
 import type { OperationProgram } from "./operation-planner/types.js";
 import type { OperationAction } from "./operations/actions.js";
@@ -29,7 +30,11 @@ type PolarCall =
   | { readonly method: "createProduct"; readonly payload: unknown }
   | { readonly method: "updateProduct"; readonly id: string; readonly payload: unknown }
   | { readonly method: "archiveProduct"; readonly id: string }
-  | { readonly method: "updateProductBenefits"; readonly id: string; readonly benefitIds: ReadonlyArray<string> }
+  | {
+      readonly method: "updateProductBenefits";
+      readonly id: string;
+      readonly benefitIds: ReadonlyArray<string>;
+    }
   | { readonly method: "createMeter"; readonly payload: unknown }
   | { readonly method: "updateMeter"; readonly id: string; readonly payload: unknown }
   | { readonly method: "archiveMeter"; readonly id: string };
@@ -65,89 +70,89 @@ const operation = (input: {
   rollback: input.rollback ?? noopRollback(),
 });
 
-const createProductOperation = (
-  key: string,
-  payload: ProductCreateOperationPayload,
-): Operation => operation({
-  id: `op_create_product_${key}`,
-  address: address("product", key),
-  kind: "product",
-  action: { _tag: "CreateProduct", payload },
-});
+const createProductOperation = (key: string, payload: ProductCreateOperationPayload): Operation =>
+  operation({
+    id: `op_create_product_${key}`,
+    address: address("product", key),
+    kind: "product",
+    action: { _tag: "CreateProduct", payload },
+  });
 
 const updateProductOperation = (
   key: string,
   id: string,
   payload: ProductUpdateOperationPayload,
-): Operation => operation({
-  id: `op_update_product_${key}`,
-  address: address("product", key),
-  kind: "product",
-  action: { _tag: "UpdateProduct", id, payload },
-});
+): Operation =>
+  operation({
+    id: `op_update_product_${key}`,
+    address: address("product", key),
+    kind: "product",
+    action: { _tag: "UpdateProduct", id, payload },
+  });
 
-const archiveProductOperation = (key: string, id: string): Operation => operation({
-  id: `op_archive_product_${key}`,
-  address: address("product", key),
-  kind: "product",
-  action: { _tag: "ArchiveProduct", id, payload: { isArchived: true } },
-});
+const archiveProductOperation = (key: string, id: string): Operation =>
+  operation({
+    id: `op_archive_product_${key}`,
+    address: address("product", key),
+    kind: "product",
+    action: { _tag: "ArchiveProduct", id, payload: { isArchived: true } },
+  });
 
 const updateProductBenefitsOperation = (
   key: string,
   id: string,
   payload: ProductBenefitsUpdateOperationPayload,
-): Operation => operation({
-  id: `op_update_product_benefits_${key}`,
-  address: address("product", key),
-  kind: "product",
-  action: { _tag: "UpdateProductBenefits", id, payload },
-});
+): Operation =>
+  operation({
+    id: `op_update_product_benefits_${key}`,
+    address: address("product", key),
+    kind: "product",
+    action: { _tag: "UpdateProductBenefits", id, payload },
+  });
 
-const createBenefitOperation = (
-  key: string,
-  payload: BenefitCreateOperationPayload,
-): Operation => operation({
-  id: `op_create_benefit_${key}`,
-  address: address("benefit", key),
-  kind: "benefit",
-  action: { _tag: "CreateBenefit", payload },
-});
+const createBenefitOperation = (key: string, payload: BenefitCreateOperationPayload): Operation =>
+  operation({
+    id: `op_create_benefit_${key}`,
+    address: address("benefit", key),
+    kind: "benefit",
+    action: { _tag: "CreateBenefit", payload },
+  });
 
 const updateBenefitOperation = (
   key: string,
   id: string,
   payload: BenefitUpdateOperationPayload,
-): Operation => operation({
-  id: `op_update_benefit_${key}`,
-  address: address("benefit", key),
-  kind: "benefit",
-  action: { _tag: "UpdateBenefit", id, payload },
-});
+): Operation =>
+  operation({
+    id: `op_update_benefit_${key}`,
+    address: address("benefit", key),
+    kind: "benefit",
+    action: { _tag: "UpdateBenefit", id, payload },
+  });
 
-const deleteBenefitOperation = (key: string, id: string): Operation => operation({
-  id: `op_delete_benefit_${key}`,
-  address: address("benefit", key),
-  kind: "benefit",
-  action: { _tag: "DeleteBenefit", id },
-});
+const deleteBenefitOperation = (key: string, id: string): Operation =>
+  operation({
+    id: `op_delete_benefit_${key}`,
+    address: address("benefit", key),
+    kind: "benefit",
+    action: { _tag: "DeleteBenefit", id },
+  });
 
-const createMeterOperation = (
-  key: string,
-  payload: MeterCreateOperationPayload,
-): Operation => operation({
-  id: `op_create_meter_${key}`,
-  address: address("meter", key),
-  kind: "meter",
-  action: { _tag: "CreateMeter", payload },
-});
+const createMeterOperation = (key: string, payload: MeterCreateOperationPayload): Operation =>
+  operation({
+    id: `op_create_meter_${key}`,
+    address: address("meter", key),
+    kind: "meter",
+    action: { _tag: "CreateMeter", payload },
+  });
 
-const archiveMeterOperation = (key: string, id: string): Operation => operation({
-  id: `op_archive_meter_${key}`,
-  address: address("meter", key),
-  kind: "meter",
-  action: { _tag: "ArchiveMeter", id, payload: { isArchived: true } },
-});
+const archiveMeterOperation = (key: string, id: string): Operation =>
+  operation({
+    id: `op_archive_meter_${key}`,
+    address: address("meter", key),
+    kind: "meter",
+    action: { _tag: "ArchiveMeter", id, payload: { isArchived: true } },
+  });
 
 const program = (
   operations: ReadonlyArray<Operation>,
@@ -159,7 +164,7 @@ const bindings = (
 ): ResourceBindings => new Map(entries);
 
 const metadata = (kind: ResourceKind, key: string) => ({
-  paac: JSON.stringify({
+  [PAAC_METADATA_KEY]: JSON.stringify({
     v: 1,
     kind,
     addr: `${kind}.${key}`,
@@ -173,7 +178,11 @@ const fixedPrice = (amount: number, currency: "usd" | "eur" = "usd") => ({
   priceAmount: amount,
 });
 
-const meteredPrice = (meter: ResourceAddress, amount = "0.01", currency: "usd" | "eur" = "usd") => ({
+const meteredPrice = (
+  meter: ResourceAddress,
+  amount = "0.01",
+  currency: "usd" | "eur" = "usd",
+) => ({
   amountType: "metered_unit" as const,
   priceCurrency: currency,
   meterId: polarIdRef(meter),
@@ -289,14 +298,14 @@ const execute = (
   calls: Array<PolarCall>,
   failures: FakePolarFailure = {},
 ) =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const executor = yield* Executor;
     yield* executor.execute(input);
   }).pipe(Effect.provide(testLayer(calls, failures)));
 
 describe("Executor product create dispatch", () => {
   it.effect("creates a product with all supported product fields and a fixed price", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
       const payload: ProductCreateOperationPayload = {
         metadata: metadata("product", "pro"),
@@ -320,7 +329,7 @@ describe("Executor product create dispatch", () => {
   );
 
   it.effect("creates a product with a resolved metered price", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
       const meterAddress = address("meter", "requests");
       const payload: ProductCreateOperationPayload = {
@@ -362,7 +371,7 @@ describe("Executor product create dispatch", () => {
   );
 
   it.effect("creates a product with fixed and resolved metered prices", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
       const meterAddress = address("meter", "requests");
       const payload: ProductCreateOperationPayload = {
@@ -407,7 +416,7 @@ describe("Executor product create dispatch", () => {
 
 describe("Executor meter create dispatch", () => {
   it.effect("creates a meter with all supported meter fields", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
       const payload: MeterCreateOperationPayload = {
         metadata: metadata("meter", "requests"),
@@ -444,49 +453,51 @@ describe("Executor meter create dispatch", () => {
 });
 
 describe("Executor benefit dispatch", () => {
-  it.effect("creates a Benefit with a resolved Meter reference and records its binding for Product attachments", () =>
-    Effect.gen(function*() {
-      const calls: Array<PolarCall> = [];
-      const meterAddress = address("meter", "requests");
-      const benefitAddress = address("benefit", "included-requests");
-      const productPayload: ProductBenefitsUpdateOperationPayload = {
-        benefits: [polarIdRef(benefitAddress)],
-      };
+  it.effect(
+    "creates a Benefit with a resolved Meter reference and records its binding for Product attachments",
+    () =>
+      Effect.gen(function* () {
+        const calls: Array<PolarCall> = [];
+        const meterAddress = address("meter", "requests");
+        const benefitAddress = address("benefit", "included-requests");
+        const productPayload: ProductBenefitsUpdateOperationPayload = {
+          benefits: [polarIdRef(benefitAddress)],
+        };
 
-      yield* execute(
-        program(
-          [
-            createBenefitOperation("included-requests", meterCreditBenefitPayload(meterAddress)),
-            updateProductBenefitsOperation("pro", "prod_pro", productPayload),
-          ],
-          bindings([[meterAddress, { polarId: "met_requests" }]]),
-        ),
-        calls,
-      );
+        yield* execute(
+          program(
+            [
+              createBenefitOperation("included-requests", meterCreditBenefitPayload(meterAddress)),
+              updateProductBenefitsOperation("pro", "prod_pro", productPayload),
+            ],
+            bindings([[meterAddress, { polarId: "met_requests" }]]),
+          ),
+          calls,
+        );
 
-      expect(calls).toEqual([
-        {
-          method: "createBenefit",
-          payload: {
-            ...meterCreditBenefitPayload(meterAddress),
-            properties: {
-              meterId: "met_requests",
-              units: 10_000,
-              rollover: false,
+        expect(calls).toEqual([
+          {
+            method: "createBenefit",
+            payload: {
+              ...meterCreditBenefitPayload(meterAddress),
+              properties: {
+                meterId: "met_requests",
+                units: 10_000,
+                rollover: false,
+              },
             },
           },
-        },
-        {
-          method: "updateProductBenefits",
-          id: "prod_pro",
-          benefitIds: ["ben_created"],
-        },
-      ]);
-    }),
+          {
+            method: "updateProductBenefits",
+            id: "prod_pro",
+            benefitIds: ["ben_created"],
+          },
+        ]);
+      }),
   );
 
   it.effect("updates a Benefit with resolved meter-credit properties", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
       const meterAddress = address("meter", "requests");
       const payload: BenefitUpdateOperationPayload = {
@@ -525,7 +536,7 @@ describe("Executor benefit dispatch", () => {
   );
 
   it.effect("deletes a Benefit", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
 
       yield* execute(program([deleteBenefitOperation("included-requests", "ben_existing")]), calls);
@@ -542,7 +553,7 @@ describe("Executor benefit dispatch", () => {
 
 describe("Executor product update dispatch", () => {
   it.effect("updates a product from one fixed price to fixed and resolved metered prices", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
       const meterAddress = address("meter", "requests");
       const payload: ProductUpdateOperationPayload = {
@@ -580,123 +591,125 @@ describe("Executor product update dispatch", () => {
 });
 
 describe("Executor rollback", () => {
-  it.effect("rolls back Product, Benefit, and Meter creation in reverse order after attachment failure", () =>
-    Effect.gen(function*() {
-      const calls: Array<PolarCall> = [];
-      const meterAddress = address("meter", "requests");
-      const benefitAddress = address("benefit", "included-requests");
-      const productAddress = address("product", "pro");
-      const meterPayload: MeterCreateOperationPayload = {
-        metadata: metadata("meter", "requests"),
-        name: "Requests",
-        unit: "scalar",
-        customLabel: null,
-        customMultiplier: null,
-        filter: { conjunction: "and", clauses: [] },
-        aggregation: { func: "count" },
-      };
-      const productPayload: ProductCreateOperationPayload = {
-        metadata: metadata("product", "pro"),
-        name: "Pro",
-        description: null,
-        visibility: "public",
-        prices: [fixedPrice(3000, "usd")],
-        recurringInterval: "month",
-        recurringIntervalCount: 1,
-      };
+  it.effect(
+    "rolls back Product, Benefit, and Meter creation in reverse order after attachment failure",
+    () =>
+      Effect.gen(function* () {
+        const calls: Array<PolarCall> = [];
+        const meterAddress = address("meter", "requests");
+        const benefitAddress = address("benefit", "included-requests");
+        const productAddress = address("product", "pro");
+        const meterPayload: MeterCreateOperationPayload = {
+          metadata: metadata("meter", "requests"),
+          name: "Requests",
+          unit: "scalar",
+          customLabel: null,
+          customMultiplier: null,
+          filter: { conjunction: "and", clauses: [] },
+          aggregation: { func: "count" },
+        };
+        const productPayload: ProductCreateOperationPayload = {
+          metadata: metadata("product", "pro"),
+          name: "Pro",
+          description: null,
+          visibility: "public",
+          prices: [fixedPrice(3000, "usd")],
+          recurringInterval: "month",
+          recurringIntervalCount: 1,
+        };
 
-      const result = yield* execute(
-        program([
-          operation({
-            id: "op_1",
-            address: meterAddress,
-            kind: "meter",
-            action: { _tag: "CreateMeter", payload: meterPayload },
-            rollback: {
-              _tag: "RollbackOperation",
-              action: {
-                _tag: "ArchiveMeter",
-                id: polarIdRef(meterAddress),
-                payload: { isArchived: true },
+        const result = yield* execute(
+          program([
+            operation({
+              id: "op_1",
+              address: meterAddress,
+              kind: "meter",
+              action: { _tag: "CreateMeter", payload: meterPayload },
+              rollback: {
+                _tag: "RollbackOperation",
+                action: {
+                  _tag: "ArchiveMeter",
+                  id: polarIdRef(meterAddress),
+                  payload: { isArchived: true },
+                },
               },
-            },
-          }),
-          operation({
-            id: "op_2",
-            address: benefitAddress,
-            kind: "benefit",
-            action: {
-              _tag: "CreateBenefit",
-              payload: meterCreditBenefitPayload(meterAddress),
-            },
-            rollback: {
-              _tag: "RollbackOperation",
+            }),
+            operation({
+              id: "op_2",
+              address: benefitAddress,
+              kind: "benefit",
               action: {
-                _tag: "DeleteBenefit",
-                id: polarIdRef(benefitAddress),
+                _tag: "CreateBenefit",
+                payload: meterCreditBenefitPayload(meterAddress),
               },
-            },
-          }),
-          operation({
-            id: "op_3",
-            address: productAddress,
-            kind: "product",
-            action: { _tag: "CreateProduct", payload: productPayload },
-            rollback: {
-              _tag: "RollbackOperation",
+              rollback: {
+                _tag: "RollbackOperation",
+                action: {
+                  _tag: "DeleteBenefit",
+                  id: polarIdRef(benefitAddress),
+                },
+              },
+            }),
+            operation({
+              id: "op_3",
+              address: productAddress,
+              kind: "product",
+              action: { _tag: "CreateProduct", payload: productPayload },
+              rollback: {
+                _tag: "RollbackOperation",
+                action: {
+                  _tag: "ArchiveProduct",
+                  id: polarIdRef(productAddress),
+                  payload: { isArchived: true },
+                },
+              },
+            }),
+            operation({
+              id: "op_4",
+              address: productAddress,
+              kind: "product",
               action: {
-                _tag: "ArchiveProduct",
+                _tag: "UpdateProductBenefits",
                 id: polarIdRef(productAddress),
-                payload: { isArchived: true },
+                payload: { benefits: [polarIdRef(benefitAddress)] },
               },
-            },
+            }),
+          ]),
+          calls,
+          { updateProductBenefits: "boom" },
+        ).pipe(
+          Effect.match({
+            onFailure: (error) => ({ _tag: "Failure" as const, error }),
+            onSuccess: () => ({ _tag: "Success" as const }),
           }),
-          operation({
-            id: "op_4",
-            address: productAddress,
-            kind: "product",
-            action: {
-              _tag: "UpdateProductBenefits",
-              id: polarIdRef(productAddress),
-              payload: { benefits: [polarIdRef(benefitAddress)] },
-            },
-          }),
-        ]),
-        calls,
-        { updateProductBenefits: "boom" },
-      ).pipe(
-        Effect.match({
-          onFailure: (error) => ({ _tag: "Failure" as const, error }),
-          onSuccess: () => ({ _tag: "Success" as const }),
-        }),
-      );
+        );
 
-      expect(result._tag).toBe("Failure");
-      expect(calls).toEqual([
-        { method: "createMeter", payload: meterPayload },
-        {
-          method: "createBenefit",
-          payload: {
-            ...meterCreditBenefitPayload(meterAddress),
-            properties: {
-              meterId: "met_created",
-              units: 10_000,
-              rollover: false,
+        expect(result._tag).toBe("Failure");
+        expect(calls).toEqual([
+          { method: "createMeter", payload: meterPayload },
+          {
+            method: "createBenefit",
+            payload: {
+              ...meterCreditBenefitPayload(meterAddress),
+              properties: {
+                meterId: "met_created",
+                units: 10_000,
+                rollover: false,
+              },
             },
           },
-        },
-        { method: "createProduct", payload: productPayload },
-        { method: "archiveProduct", id: "prod_created" },
-        { method: "deleteBenefit", id: "ben_created" },
-        { method: "archiveMeter", id: "met_created" },
-      ]);
-    }),
+          { method: "createProduct", payload: productPayload },
+          { method: "archiveProduct", id: "prod_created" },
+          { method: "deleteBenefit", id: "ben_created" },
+          { method: "archiveMeter", id: "met_created" },
+        ]);
+      }),
   );
 });
 
 describe("Executor archive dispatch", () => {
   it.effect("archives a product", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
 
       yield* execute(program([archiveProductOperation("pro", "prod_pro")]), calls);
@@ -711,7 +724,7 @@ describe("Executor archive dispatch", () => {
   );
 
   it.effect("archives a meter", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
 
       yield* execute(program([archiveMeterOperation("requests", "met_requests")]), calls);

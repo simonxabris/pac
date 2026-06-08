@@ -9,10 +9,12 @@ import {
   polarIntegerMinorUnitNumber,
 } from "./currency//currency.js";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
+import { PAAC_METADATA_KEY } from "./core/metadata.js";
 import type { CurrentResource } from "./core/resource.js";
 import { PolarClient } from "./polar/service.js";
 import {
   CurrentBenefitResourceSchema,
+  normalizeBenefitMetadata,
   type BenefitAddress,
   type CurrentBenefitResource,
 } from "./resources/benefit.js";
@@ -124,7 +126,10 @@ const RemoteProductSdk = Schema.Struct({
 const RemoteProductResourceInput = Schema.Struct({
   product: RemoteProductSdk,
   meterAddressesById: Schema.Record(Schema.String, MeterAddressSchema),
-  benefitAddressesById: Schema.Record(Schema.String, Schema.TemplateLiteral(["benefit.", Schema.String])),
+  benefitAddressesById: Schema.Record(
+    Schema.String,
+    Schema.TemplateLiteral(["benefit.", Schema.String]),
+  ),
 });
 
 const RemoteBenefitMeterCreditSdk = Schema.Struct({
@@ -151,7 +156,20 @@ const RemoteBenefitCustomSdk = Schema.Struct({
   }),
 });
 
-const RemoteBenefitSdk = Schema.Union([RemoteBenefitMeterCreditSdk, RemoteBenefitCustomSdk]);
+const RemoteBenefitFeatureFlagSdk = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("feature_flag"),
+  description: Schema.String,
+  isDeleted: Schema.Boolean,
+  metadata: MetadataRecord,
+  properties: Schema.Struct({}),
+});
+
+const RemoteBenefitSdk = Schema.Union([
+  RemoteBenefitMeterCreditSdk,
+  RemoteBenefitCustomSdk,
+  RemoteBenefitFeatureFlagSdk,
+]);
 
 const RemoteBenefitResourceInput = Schema.Struct({
   benefit: RemoteBenefitSdk,
@@ -181,10 +199,10 @@ const errorMessage = (cause: unknown): string => {
 
 const hasPaacMetadata = (remote: {
   readonly metadata?: Readonly<Record<string, unknown>>;
-}): boolean => remote.metadata?.paac !== undefined;
+}): boolean => remote.metadata?.[PAAC_METADATA_KEY] !== undefined;
 
 const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
-  const value = metadata.paac;
+  const value = metadata[PAAC_METADATA_KEY];
   if (typeof value !== "string") {
     throw new Error("Remote resource does not contain PAAC metadata.");
   }
@@ -211,6 +229,11 @@ const identityForKind = (
     throw new Error(`Expected PAAC metadata kind '${kind}', got '${identity.kind}'.`);
   }
   return identity;
+};
+
+const stripPaacMetadata = (metadata: typeof MetadataRecord.Type) => {
+  const { [PAAC_METADATA_KEY]: _paac, ...userMetadata } = metadata;
+  return normalizeBenefitMetadata(userMetadata as Record<string, string | number | boolean>);
 };
 
 const productPriceToSpec = (
@@ -271,7 +294,7 @@ const productToCurrentResource = ({
   }));
   const benefits = [
     ...new Set(
-      attachedBenefits.flatMap((benefit) => benefit.address === null ? [] : [benefit.address]),
+      attachedBenefits.flatMap((benefit) => (benefit.address === null ? [] : [benefit.address])),
     ),
   ].sort() as ReadonlyArray<BenefitAddress>;
 
@@ -407,6 +430,15 @@ const benefitToCurrentResource = ({
           note: benefit.properties.note,
         },
       };
+    case "feature_flag":
+      return {
+        ...base,
+        spec: {
+          type: "feature-flag",
+          description: benefit.description,
+          metadata: stripPaacMetadata(benefit.metadata),
+        },
+      };
   }
 };
 
@@ -439,6 +471,18 @@ const benefitResourceToRemoteInput = (
           isDeleted: resource.isRemoved,
           metadata: {},
           properties: { note: resource.spec.note },
+        },
+        meterAddressesById: {},
+      };
+    case "feature-flag":
+      return {
+        benefit: {
+          id: resource.polarId,
+          type: "feature_flag",
+          description: resource.spec.description,
+          isDeleted: resource.isRemoved,
+          metadata: resource.spec.metadata,
+          properties: {},
         },
         meterAddressesById: {},
       };
@@ -525,14 +569,14 @@ export class RemoteResourceFetchError extends Schema.TaggedErrorClass<RemoteReso
   {
     message: Schema.String,
   },
-) { }
+) {}
 
 export class DuplicateRemoteResourceAddress extends Schema.TaggedErrorClass<DuplicateRemoteResourceAddress>()(
   "DuplicateRemoteResourceAddress",
   {
     address: ResourceAddressSchema,
   },
-) { }
+) {}
 
 export class RemoteResourceFetcher extends Context.Service<
   RemoteResourceFetcher,
@@ -545,12 +589,12 @@ export class RemoteResourceFetcher extends Context.Service<
 >()("@app/RemoteResourceFetcher") {
   static readonly layer = Layer.effect(
     RemoteResourceFetcher,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const polar = yield* PolarClient;
 
       return RemoteResourceFetcher.of({
         fetch: () =>
-          Effect.gen(function*() {
+          Effect.gen(function* () {
             const [remoteProducts, remoteMeters, remoteBenefits] = yield* Effect.all(
               [polar.listProducts(), polar.listMeters(), polar.listBenefits()] as const,
               { concurrency: "unbounded" },
@@ -602,7 +646,11 @@ export class RemoteResourceFetcher extends Context.Service<
             const products = yield* Effect.forEach(
               remoteProducts.filter(hasPaacMetadata),
               (product) =>
-                decodeRemoteProductResource({ product, meterAddressesById, benefitAddressesById }).pipe(
+                decodeRemoteProductResource({
+                  product,
+                  meterAddressesById,
+                  benefitAddressesById,
+                }).pipe(
                   Effect.mapError(
                     (cause) =>
                       new RemoteResourceFetchError({

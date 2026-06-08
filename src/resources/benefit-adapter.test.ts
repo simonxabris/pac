@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import { BenefitResourceAdapter } from "./benefit-adapter.js";
-import { Benefit, type BenefitResource, type BenefitSpec, type CurrentBenefitResource } from "./benefit.js";
+import {
+  Benefit,
+  type BenefitResource,
+  type BenefitSpec,
+  type CurrentBenefitResource,
+} from "./benefit.js";
 import { resetRegistry } from "./registry.js";
 
 const currentFromDesired = (
@@ -23,7 +29,7 @@ describe("BenefitResourceAdapter", () => {
   });
 
   it.effect("discovers meter-credit Meter dependencies", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",
@@ -38,7 +44,7 @@ describe("BenefitResourceAdapter", () => {
   );
 
   it.effect("discovers no dependencies for custom Benefits", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("onboarding", {
         type: "custom",
         description: "Your onboarding link",
@@ -51,8 +57,21 @@ describe("BenefitResourceAdapter", () => {
     }),
   );
 
+  it.effect("discovers no dependencies for feature-flag Benefits", () =>
+    Effect.gen(function* () {
+      const desired = new Benefit("premium-features", {
+        type: "feature-flag",
+        description: "Premium Features",
+      }).toDesiredResource();
+
+      const dependencies = yield* BenefitResourceAdapter.dependencies(desired);
+
+      expect(dependencies).toEqual([]);
+    }),
+  );
+
   it.effect("returns a planned noop when Benefit specs match", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",
@@ -79,7 +98,7 @@ describe("BenefitResourceAdapter", () => {
   );
 
   it.effect("returns an update node with field-level changes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",
@@ -137,8 +156,45 @@ describe("BenefitResourceAdapter", () => {
     }),
   );
 
+  it.effect("returns an update node when feature-flag metadata changes", () =>
+    Effect.gen(function* () {
+      const desired = new Benefit("premium-features", {
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { tier: "pro" },
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, {
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { tier: "basic" },
+      });
+
+      const result = yield* BenefitResourceAdapter.diff(desired, current);
+
+      expect(result).toEqual({
+        _tag: "Planned",
+        node: {
+          _tag: "Update",
+          address: "benefit.premium-features",
+          kind: "benefit",
+          desired,
+          current,
+          changes: [
+            {
+              _tag: "FieldChange",
+              path: ["metadata"],
+              before: { tier: "basic" },
+              after: { tier: "pro" },
+            },
+          ],
+        },
+        diagnostics: [],
+      });
+    }),
+  );
+
   it.effect("blocks Benefit type changes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",
@@ -176,7 +232,7 @@ describe("BenefitResourceAdapter", () => {
   );
 
   it.effect("creates a Polar-shaped create Benefit payload and delete rollback", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",
@@ -205,7 +261,7 @@ describe("BenefitResourceAdapter", () => {
             _tag: "CreateBenefit",
             payload: {
               metadata: {
-                paac: JSON.stringify({
+                [PAAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "benefit",
                   addr: "benefit.included-requests",
@@ -242,7 +298,7 @@ describe("BenefitResourceAdapter", () => {
   );
 
   it.effect("creates a Polar-shaped custom Benefit create payload", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("onboarding", {
         type: "custom",
         description: "Your onboarding link",
@@ -263,7 +319,7 @@ describe("BenefitResourceAdapter", () => {
         _tag: "CreateBenefit",
         payload: {
           metadata: {
-            paac: JSON.stringify({
+            [PAAC_METADATA_KEY]: JSON.stringify({
               v: 1,
               kind: "benefit",
               addr: "benefit.onboarding",
@@ -278,8 +334,48 @@ describe("BenefitResourceAdapter", () => {
     }),
   );
 
+  it.effect("creates a Polar-shaped feature-flag Benefit create payload", () =>
+    Effect.gen(function* () {
+      const desired = new Benefit("premium-features", {
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { tier: "pro", seats: 10, beta: true },
+      }).toDesiredResource();
+
+      const operations = yield* BenefitResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Create",
+          address: desired.address,
+          kind: "benefit",
+          desired,
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations[0]?.action).toEqual({
+        _tag: "CreateBenefit",
+        payload: {
+          metadata: {
+            beta: true,
+            seats: 10,
+            tier: "pro",
+            [PAAC_METADATA_KEY]: JSON.stringify({
+              v: 1,
+              kind: "benefit",
+              addr: "benefit.premium-features",
+              key: "premium-features",
+            }),
+          },
+          type: "feature_flag",
+          description: "Premium Features",
+          properties: {},
+        },
+      });
+    }),
+  );
+
   it.effect("creates a Polar-shaped custom Benefit update payload", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("onboarding", {
         type: "custom",
         description: "Your onboarding link",
@@ -298,7 +394,9 @@ describe("BenefitResourceAdapter", () => {
           kind: "benefit",
           desired,
           current,
-          changes: [{ _tag: "FieldChange", path: ["note"], before: "Old note", after: "# Welcome" }],
+          changes: [
+            { _tag: "FieldChange", path: ["note"], before: "Old note", after: "# Welcome" },
+          ],
         },
         { nextOperationId: () => "op_1" },
       );
@@ -314,8 +412,78 @@ describe("BenefitResourceAdapter", () => {
     }),
   );
 
+  it.effect("creates Polar-shaped feature-flag metadata update and rollback payloads", () =>
+    Effect.gen(function* () {
+      const desired = new Benefit("premium-features", {
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { tier: "pro" },
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, {
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { tier: "basic" },
+      });
+
+      const operations = yield* BenefitResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "benefit",
+          desired,
+          current,
+          changes: [
+            {
+              _tag: "FieldChange",
+              path: ["metadata"],
+              before: { tier: "basic" },
+              after: { tier: "pro" },
+            },
+          ],
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations[0]?.action).toEqual({
+        _tag: "UpdateBenefit",
+        id: "polar-premium-features",
+        payload: {
+          type: "feature_flag",
+          metadata: {
+            tier: "pro",
+            [PAAC_METADATA_KEY]: JSON.stringify({
+              v: 1,
+              kind: "benefit",
+              addr: "benefit.premium-features",
+              key: "premium-features",
+            }),
+          },
+        },
+      });
+      expect(operations[0]?.rollback).toEqual({
+        _tag: "RollbackOperation",
+        action: {
+          _tag: "UpdateBenefit",
+          id: "polar-premium-features",
+          payload: {
+            type: "feature_flag",
+            metadata: {
+              tier: "basic",
+              [PAAC_METADATA_KEY]: JSON.stringify({
+                v: 1,
+                kind: "benefit",
+                addr: "benefit.premium-features",
+                key: "premium-features",
+              }),
+            },
+          },
+        },
+      });
+    }),
+  );
+
   it.effect("creates Polar-shaped update Benefit payloads and rollback payloads", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",
@@ -339,8 +507,18 @@ describe("BenefitResourceAdapter", () => {
           desired,
           current,
           changes: [
-            { _tag: "FieldChange", path: ["description"], before: "5k API requests", after: "10k API requests" },
-            { _tag: "FieldChange", path: ["meter"], before: "meter.old-requests", after: "meter.requests" },
+            {
+              _tag: "FieldChange",
+              path: ["description"],
+              before: "5k API requests",
+              after: "10k API requests",
+            },
+            {
+              _tag: "FieldChange",
+              path: ["meter"],
+              before: "meter.old-requests",
+              after: "meter.requests",
+            },
             { _tag: "FieldChange", path: ["units"], before: 5_000, after: 10_000 },
             { _tag: "FieldChange", path: ["rollover"], before: false, after: true },
           ],
@@ -397,7 +575,7 @@ describe("BenefitResourceAdapter", () => {
   );
 
   it.effect("creates a delete-mode remove operation with unsupported rollback", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Benefit("included-requests", {
         type: "meter-credit",
         description: "10k API requests",

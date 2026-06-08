@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from "@effect/vitest";
 import { Effect } from "effect";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import { ProductResourceAdapter } from "./product-adapter.js";
 import {
   customPrice,
@@ -24,7 +25,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
   });
 
   it.effect("creates a Polar-shaped create product payload with metered price refs", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         description: "For serious users",
@@ -34,8 +35,18 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
         prices: [
           fixedPrice({ amount: "3000", currency: "usd" }),
           freePrice({ currency: "eur" }),
-          customPrice({ currency: "usd", minimumAmount: "500", maximumAmount: null, presetAmount: "1000" }),
-          meteredUnitPrice({ meter: "meter.requests", amount: "0.01", currency: "usd", capAmount: "100" }),
+          customPrice({
+            currency: "usd",
+            minimumAmount: "500",
+            maximumAmount: null,
+            presetAmount: "1000",
+          }),
+          meteredUnitPrice({
+            meter: "meter.requests",
+            amount: "0.01",
+            currency: "usd",
+            capAmount: "100",
+          }),
         ],
       }).toDesiredResource();
 
@@ -59,7 +70,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
             _tag: "CreateProduct",
             payload: {
               metadata: {
-                paac: JSON.stringify({
+                [PAAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "product",
                   addr: "product.pro",
@@ -120,12 +131,17 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
   );
 
   it.effect("creates Polar payloads from user-facing major-unit price config", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [
           fixedPrice({ amount: 30, currency: "usd" }),
-          meteredUnitPrice({ meter: "meter.requests", amount: "0.001", currency: "usd", capAmount: 100 }),
+          meteredUnitPrice({
+            meter: "meter.requests",
+            amount: "0.001",
+            currency: "usd",
+            capAmount: 100,
+          }),
         ],
       }).toDesiredResource();
 
@@ -162,163 +178,167 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
     }),
   );
 
-  it.effect("creates an attachment operation after product creation when Benefits are declared", () =>
-    Effect.gen(function*() {
-      const desired = new Product("pro", {
-        name: "Pro",
-        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
-        benefits: ["benefit.requests", "benefit.seats"],
-      }).toDesiredResource();
+  it.effect(
+    "creates an attachment operation after product creation when Benefits are declared",
+    () =>
+      Effect.gen(function* () {
+        const desired = new Product("pro", {
+          name: "Pro",
+          prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+          benefits: ["benefit.requests", "benefit.seats"],
+        }).toDesiredResource();
 
-      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
-        {
-          _tag: "Create",
-          address: desired.address,
-          kind: "product",
-          desired,
-        },
-        {
-          nextOperationId: (() => {
-            let index = 1;
-            return () => `op_${index++}`;
-          })(),
-        },
-      );
-
-      expect(operations.map((operation) => operation.action)).toEqual([
-        {
-          _tag: "CreateProduct",
-          payload: {
-            metadata: {
-              paac: JSON.stringify({
-                v: 1,
-                kind: "product",
-                addr: "product.pro",
-                key: "pro",
-              }),
-            },
-            name: "Pro",
-            description: null,
-            visibility: "public",
-            prices: [
-              {
-                amountType: "fixed",
-                priceCurrency: "usd",
-                priceAmount: 300000,
-              },
-            ],
-            recurringInterval: null,
-            recurringIntervalCount: null,
+        const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+          {
+            _tag: "Create",
+            address: desired.address,
+            kind: "product",
+            desired,
           },
-        },
-        {
-          _tag: "UpdateProductBenefits",
-          id: {
-            _tag: "Ref",
-            address: "product.pro",
-            field: "polarId",
+          {
+            nextOperationId: (() => {
+              let index = 1;
+              return () => `op_${index++}`;
+            })(),
           },
-          payload: {
-            benefits: [
-              {
-                _tag: "Ref",
-                address: "benefit.requests",
-                field: "polarId",
+        );
+
+        expect(operations.map((operation) => operation.action)).toEqual([
+          {
+            _tag: "CreateProduct",
+            payload: {
+              metadata: {
+                [PAAC_METADATA_KEY]: JSON.stringify({
+                  v: 1,
+                  kind: "product",
+                  addr: "product.pro",
+                  key: "pro",
+                }),
               },
-              {
-                _tag: "Ref",
-                address: "benefit.seats",
-                field: "polarId",
-              },
-            ],
+              name: "Pro",
+              description: null,
+              visibility: "public",
+              prices: [
+                {
+                  amountType: "fixed",
+                  priceCurrency: "usd",
+                  priceAmount: 300000,
+                },
+              ],
+              recurringInterval: null,
+              recurringIntervalCount: null,
+            },
           },
-        },
-      ]);
-    }),
-  );
-
-  it.effect("creates Product Benefit update and rollback payloads for attachment-only changes", () =>
-    Effect.gen(function*() {
-      const desired = new Product("pro", {
-        name: "Pro",
-        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
-        benefits: ["benefit.new"],
-      }).toDesiredResource();
-      const current = currentProductResource({
-        desired,
-        spec: {
-          ...desired.spec,
-          benefits: ["benefit.old"],
-        },
-        providerState: {
-          prices: [
-            {
-              polarPriceId: "polar-price-0",
-              spec: desired.spec.prices[0]!,
-            },
-          ],
-          benefits: [
-            {
-              polarBenefitId: "ben_old",
-              address: "benefit.old",
-            },
-          ],
-        },
-      });
-
-      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
-        {
-          _tag: "Update",
-          address: desired.address,
-          kind: "product",
-          desired,
-          current,
-          changes: [
-            {
-              _tag: "FieldChange",
-              path: ["benefits"],
-              before: ["benefit.old"],
-              after: ["benefit.new"],
-            },
-          ],
-        },
-        { nextOperationId: () => "op_1" },
-      );
-
-      expect(operations).toEqual([
-        {
-          _tag: "Operation",
-          id: "op_1",
-          address: "product.pro",
-          kind: "product",
-          action: {
+          {
             _tag: "UpdateProductBenefits",
-            id: "polar-pro",
+            id: {
+              _tag: "Ref",
+              address: "product.pro",
+              field: "polarId",
+            },
             payload: {
               benefits: [
                 {
                   _tag: "Ref",
-                  address: "benefit.new",
+                  address: "benefit.requests",
+                  field: "polarId",
+                },
+                {
+                  _tag: "Ref",
+                  address: "benefit.seats",
                   field: "polarId",
                 },
               ],
             },
           },
-          rollback: {
-            _tag: "RollbackOperation",
+        ]);
+      }),
+  );
+
+  it.effect(
+    "creates Product Benefit update and rollback payloads for attachment-only changes",
+    () =>
+      Effect.gen(function* () {
+        const desired = new Product("pro", {
+          name: "Pro",
+          prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+          benefits: ["benefit.new"],
+        }).toDesiredResource();
+        const current = currentProductResource({
+          desired,
+          spec: {
+            ...desired.spec,
+            benefits: ["benefit.old"],
+          },
+          providerState: {
+            prices: [
+              {
+                polarPriceId: "polar-price-0",
+                spec: desired.spec.prices[0]!,
+              },
+            ],
+            benefits: [
+              {
+                polarBenefitId: "ben_old",
+                address: "benefit.old",
+              },
+            ],
+          },
+        });
+
+        const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+          {
+            _tag: "Update",
+            address: desired.address,
+            kind: "product",
+            desired,
+            current,
+            changes: [
+              {
+                _tag: "FieldChange",
+                path: ["benefits"],
+                before: ["benefit.old"],
+                after: ["benefit.new"],
+              },
+            ],
+          },
+          { nextOperationId: () => "op_1" },
+        );
+
+        expect(operations).toEqual([
+          {
+            _tag: "Operation",
+            id: "op_1",
+            address: "product.pro",
+            kind: "product",
             action: {
               _tag: "UpdateProductBenefits",
               id: "polar-pro",
-              payload: { benefits: ["ben_old"] },
+              payload: {
+                benefits: [
+                  {
+                    _tag: "Ref",
+                    address: "benefit.new",
+                    field: "polarId",
+                  },
+                ],
+              },
+            },
+            rollback: {
+              _tag: "RollbackOperation",
+              action: {
+                _tag: "UpdateProductBenefits",
+                id: "polar-pro",
+                payload: { benefits: ["ben_old"] },
+              },
             },
           },
-        },
-      ]);
-    }),
+        ]);
+      }),
   );
 
   it.effect("creates ordinary Product update before attachment update when both change", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "New Pro",
         prices: [fixedPrice({ amount: "3000", currency: "usd" })],
@@ -405,7 +425,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
   );
 
   it.effect("creates Polar-shaped update product payloads and rollback payloads", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         description: "New description",
@@ -433,7 +453,12 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
           current,
           changes: [
             { _tag: "FieldChange", path: ["name"], before: "Old Pro", after: "Pro" },
-            { _tag: "FieldChange", path: ["description"], before: "Old description", after: "New description" },
+            {
+              _tag: "FieldChange",
+              path: ["description"],
+              before: "Old description",
+              after: "New description",
+            },
             { _tag: "FieldChange", path: ["visibility"], before: "private", after: "public" },
             { _tag: "FieldChange", path: ["prices", 0, "amount"], before: "2000", after: "3000" },
           ],
@@ -488,7 +513,7 @@ describe("ProductResourceAdapter.diff", () => {
   });
 
   it.effect("returns a planned noop when product specs match", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "2000", currency: "usd" })],
@@ -512,7 +537,7 @@ describe("ProductResourceAdapter.diff", () => {
   );
 
   it.effect("returns an update node with field changes for changed product fields", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         description: "New description",
@@ -563,10 +588,17 @@ describe("ProductResourceAdapter.diff", () => {
   );
 
   it.effect("returns price field changes for changed product prices", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("usage", {
         name: "Usage",
-        prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.02", currency: "usd", capAmount: "1000" })],
+        prices: [
+          meteredUnitPrice({
+            meter: "meter.requests",
+            amount: "0.02",
+            currency: "usd",
+            capAmount: "1000",
+          }),
+        ],
       }).toDesiredResource();
       const current = currentFromDesired(desired, {
         ...desired.spec,
@@ -612,7 +644,7 @@ describe("ProductResourceAdapter.diff", () => {
   );
 
   it.effect("returns Benefit and metered-price Meter dependencies", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("usage", {
         name: "Usage",
         prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.02", currency: "usd" })],
@@ -630,7 +662,7 @@ describe("ProductResourceAdapter.diff", () => {
   );
 
   it.effect("returns an attachment-only update when Benefit attachments drift", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "3000", currency: "usd" })],
@@ -666,7 +698,7 @@ describe("ProductResourceAdapter.diff", () => {
   );
 
   it.effect("blocks Products with unmanaged attached Benefits", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "3000", currency: "usd" })],
@@ -715,7 +747,7 @@ describe("ProductResourceAdapter.diff", () => {
   );
 
   it.effect("returns a blocked result with diagnostics when recurring interval changes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("monthly", {
         name: "Monthly",
         recurringInterval: "month",

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import { Benefit, benefitSpec } from "./benefit.js";
 import { count, eventName, Meter, and } from "./meter.js";
 import { resetRegistry } from "./registry.js";
@@ -65,6 +66,47 @@ describe("Benefit", () => {
     });
   });
 
+  it("creates a canonical feature-flag Benefit resource", () => {
+    const benefit = new Benefit("premium-features", {
+      type: "feature-flag",
+      description: "Premium Features",
+      metadata: {
+        priority: "elevated",
+        seat_limit: 10,
+        beta: true,
+      },
+    });
+
+    expect(benefit.toDesiredResource()).toEqual({
+      source: "desired",
+      kind: "benefit",
+      key: "premium-features",
+      address: "benefit.premium-features",
+      spec: {
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: {
+          beta: true,
+          priority: "elevated",
+          seat_limit: 10,
+        },
+      },
+    });
+  });
+
+  it("defaults feature-flag Benefit metadata to an empty record", () => {
+    const benefit = new Benefit("premium-features", {
+      type: "feature-flag",
+      description: "Premium Features",
+    });
+
+    expect(benefit.toDesiredResource().spec).toEqual({
+      type: "feature-flag",
+      description: "Premium Features",
+      metadata: {},
+    });
+  });
+
   it("normalizes a Meter instance reference to its address", () => {
     const meter = new Meter("requests", {
       name: "Requests",
@@ -78,7 +120,10 @@ describe("Benefit", () => {
       units: 10_000,
     });
 
-    expect(benefit.toDesiredResource().spec).toMatchObject({ type: "meter-credit", meter: "meter.requests" });
+    expect(benefit.toDesiredResource().spec).toMatchObject({
+      type: "meter-credit",
+      meter: "meter.requests",
+    });
   });
 
   it("normalizes a Meter address string", () => {
@@ -89,7 +134,10 @@ describe("Benefit", () => {
       units: 10_000,
     });
 
-    expect(benefit.toDesiredResource().spec).toMatchObject({ type: "meter-credit", meter: "meter.requests" });
+    expect(benefit.toDesiredResource().spec).toMatchObject({
+      type: "meter-credit",
+      meter: "meter.requests",
+    });
   });
 
   it("defaults rollover to false", () => {
@@ -100,7 +148,10 @@ describe("Benefit", () => {
       units: 10_000,
     });
 
-    expect(benefit.toDesiredResource().spec).toMatchObject({ type: "meter-credit", rollover: false });
+    expect(benefit.toDesiredResource().spec).toMatchObject({
+      type: "meter-credit",
+      rollover: false,
+    });
   });
 
   it("validates description length", () => {
@@ -143,6 +194,58 @@ describe("Benefit", () => {
         description: "Valid description",
         meter: "requests" as "meter.requests",
         units: 1,
+      }),
+    ).toThrow();
+  });
+
+  it("validates feature-flag metadata", () => {
+    expect(() =>
+      benefitSpec({
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { "": "value" },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      benefitSpec({
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { ["x".repeat(41)]: "value" },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      benefitSpec({
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { [PAAC_METADATA_KEY]: "reserved" },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      benefitSpec({
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { empty: "" },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      benefitSpec({
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: { long: "x".repeat(501) },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      benefitSpec({
+        type: "feature-flag",
+        description: "Premium Features",
+        metadata: Object.fromEntries(
+          Array.from({ length: 50 }, (_, index) => [`k${index}`, index]),
+        ),
       }),
     ).toThrow();
   });
