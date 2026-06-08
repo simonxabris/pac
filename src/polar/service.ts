@@ -9,6 +9,7 @@ import type { BenefitsUpdateBenefitUpdate } from "@polar-sh/sdk/models/operation
 import { Effect, Layer, Redacted, Schema } from "effect";
 import * as Context from "effect/Context";
 import { AppConfig } from "../config/service.js";
+import { errorMessage } from "../utils.js";
 import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./client.js";
 
 export type PolarClientShape = {
@@ -49,17 +50,7 @@ export class PolarClientError extends Schema.TaggedErrorClass<PolarClientError>(
     operation: Schema.String,
     message: Schema.String,
   },
-) { }
-
-const errorMessage = (cause: unknown): string => {
-  if (cause instanceof Error) return cause.message;
-  if (typeof cause === "string") return cause;
-  try {
-    return JSON.stringify(cause);
-  } catch {
-    return String(cause);
-  }
-};
+) {}
 
 const fromPromise = <A>(
   operation: string,
@@ -75,7 +66,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
 ) {
   static readonly layer = Layer.effect(
     PolarClient,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const config = yield* AppConfig;
       const sdk = new Polar({
         accessToken: Redacted.value(config.polarAccessToken),

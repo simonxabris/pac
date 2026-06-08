@@ -4,6 +4,7 @@ import { Effect, Layer, Schema } from "effect";
 import * as Context from "effect/Context";
 import type { DesiredResource } from "./core/resource.js";
 import { getResources, resetRegistry } from "./resources/registry.js";
+import { errorMessage } from "./utils.js";
 
 export class UserConfigLoadError extends Schema.TaggedErrorClass<UserConfigLoadError>()(
   "UserConfigLoadError",
@@ -11,13 +12,7 @@ export class UserConfigLoadError extends Schema.TaggedErrorClass<UserConfigLoadE
     path: Schema.String,
     message: Schema.String,
   },
-) { }
-
-const errorMessage = (cause: unknown): string => {
-  if (cause instanceof Error) return cause.message;
-  if (typeof cause === "string") return cause;
-  return String(cause);
-};
+) {}
 
 const loadDesiredResources = (
   configPath = "paac.config.ts",

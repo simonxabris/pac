@@ -11,10 +11,7 @@ import {
   Planner,
   PlanNotUpToDate,
 } from "./planner.js";
-import {
-  MissingResourceAdapter,
-  ResourceAdapterPlanError,
-} from "./resource-adapter-registry.js";
+import { MissingResourceAdapter, ResourceAdapterPlanError } from "./resource-adapter-registry.js";
 import {
   DuplicateRemoteResourceAddress,
   RemoteResourceFetcher,
@@ -52,14 +49,14 @@ export class GenerateOutputPathError extends Schema.TaggedErrorClass<GenerateOut
     path: Schema.String,
     message: Schema.String,
   },
-) { }
+) {}
 
 const resolveGenerateOutputPath = (
   inputPath: string,
   fs: FileSystem.FileSystem,
   path: Path.Path,
 ): Effect.Effect<GenerateOutputDestination, GenerateOutputPathError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const absoluteInputPath = path.resolve(inputPath);
     const exists = yield* fs.exists(absoluteInputPath);
 
@@ -115,7 +112,7 @@ export class GenerateCommand extends Context.Service<
 >()("@app/GenerateCommand") {
   static readonly layer = Layer.effect(
     GenerateCommand,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const configLoader = yield* ConfigLoader;
       const remoteResourceFetcher = yield* RemoteResourceFetcher;
       const planner = yield* Planner;
@@ -125,7 +122,7 @@ export class GenerateCommand extends Context.Service<
 
       return GenerateCommand.of({
         generate: ({ config, path }) =>
-          Effect.gen(function*() {
+          Effect.gen(function* () {
             const desiredResources = yield* configLoader.loadDesiredResources(config);
 
             const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
@@ -136,7 +133,7 @@ export class GenerateCommand extends Context.Service<
 
             yield* planner.assertPlanUpToDate(plan).pipe(
               Effect.tapError((error) =>
-                Effect.gen(function*() {
+                Effect.gen(function* () {
                   yield* Console.log(
                     "Cannot generate runtime file because the PAAC config is not fully in sync with Polar.",
                   );
@@ -148,7 +145,7 @@ export class GenerateCommand extends Context.Service<
               ),
             );
 
-            const contents = yield* codeGenerator.generate(plan);
+            const contents = yield* codeGenerator.generateRuntime(plan);
             const destination = yield* resolveGenerateOutputPath(path, fs, pathService);
 
             yield* fs.makeDirectory(destination.directory, { recursive: true });
