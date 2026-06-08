@@ -1,27 +1,27 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { PAAC_METADATA_KEY } from "./core/metadata.js";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import { Executor } from "./executor.js";
-import type { OperationProgram } from "./operation-planner/types.js";
-import type { OperationAction } from "./operations/actions.js";
+import type { OperationProgram } from "../operation-planner/types.js";
+import type { OperationAction } from "../operations/actions.js";
 import type {
   BenefitCreateOperationPayload,
   BenefitUpdateOperationPayload,
-} from "./operations/payloads/benefit.js";
-import type { ResourceBindings } from "./operations/bindings.js";
-import type { Operation, RollbackAction } from "./operations/operation.js";
-import type { MeterCreateOperationPayload } from "./operations/payloads/meter.js";
+} from "../operations/payloads/benefit.js";
+import type { ResourceBindings } from "../operations/bindings.js";
+import type { Operation, RollbackAction } from "../operations/operation.js";
+import type { MeterCreateOperationPayload } from "../operations/payloads/meter.js";
 import type {
   ProductBenefitsUpdateOperationPayload,
   ProductCreateOperationPayload,
   ProductUpdateOperationPayload,
-} from "./operations/payloads/product.js";
-import type { OperationRef } from "./operations/ref.js";
-import type { PolarClientShape } from "./polar/service.js";
-import { PolarClient, PolarClientError } from "./polar/service.js";
-import type { ResourceAddress } from "./core/address.js";
-import type { ResourceKind } from "./core/kind.js";
-import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./polar/client.js";
+} from "../operations/payloads/product.js";
+import type { OperationRef } from "../operations/ref.js";
+import type { PolarClientShape } from "./polar-client.js";
+import { PolarClient, PolarClientError } from "./polar-client.js";
+import type { ResourceAddress } from "../core/address.js";
+import type { ResourceKind } from "../core/kind.js";
+import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../polar/client.js";
 
 type PolarCall =
   | { readonly method: "createBenefit"; readonly payload: unknown }

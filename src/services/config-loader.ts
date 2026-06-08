@@ -2,9 +2,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Effect, Layer, Schema } from "effect";
 import * as Context from "effect/Context";
-import type { DesiredResource } from "./core/resource.js";
-import { getResources, resetRegistry } from "./resources/registry.js";
-import { errorMessage } from "./utils.js";
+import type { DesiredResource } from "../core/resource.js";
+import { getResources, resetRegistry } from "../resources/registry.js";
+import { errorMessage } from "../utils.js";
 
 export class UserConfigLoadError extends Schema.TaggedErrorClass<UserConfigLoadError>()(
   "UserConfigLoadError",

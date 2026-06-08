@@ -5,12 +5,12 @@ import type {
   MeterCreateOperationPayload,
   MeterUpdateOperationPayload,
 } from "../operations/payloads/meter.js";
-import type { FieldChange } from "../planner.js";
+import type { FieldChange } from "../services/planner.js";
 import type {
   CreateOperationsFromPlanContext,
   ResourceAdapter,
   ResourceExecutablePlanNode,
-} from "../resource-adapter-registry.js";
+} from "../services/resource-adapter-registry.js";
 import {
   managedMetadata,
   polarIdRef,

@@ -3,10 +3,10 @@ import type { MeterUpdate } from "@polar-sh/sdk/models/components/meterupdate.js
 import type { ProductUpdate } from "@polar-sh/sdk/models/components/productupdate.js";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Context from "effect/Context";
-import { PolarClient, type PolarClientError } from "../polar/service.js";
+import { PolarClient, type PolarClientError } from "./polar-client.js";
 import { managedMetadata } from "../resources/adapter-utils.js";
 import { errorMessage, hasPaacMetadata } from "../utils.js";
-import type { ImportModel } from "./project.js";
+import type { ImportModel } from "../import/project.js";
 
 export type ImportAdoptionSummary = {
   readonly adopted: number;

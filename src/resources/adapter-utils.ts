@@ -3,7 +3,7 @@ import type { ResourceKind } from "../core/kind.js";
 import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import type { RollbackAction } from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
-import type { FieldChange } from "../planner.js";
+import type { FieldChange } from "../services/planner.js";
 
 export const valuesEqual = (left: unknown, right: unknown): boolean => Equal.equals(left, right);
 

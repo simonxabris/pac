@@ -11,12 +11,12 @@ import type {
   BenefitOperationMetadata,
   BenefitUpdateOperationPayload,
 } from "../operations/payloads/benefit.js";
-import type { Diagnostic, FieldChange } from "../planner.js";
+import type { Diagnostic, FieldChange } from "../services/planner.js";
 import type {
   CreateOperationsFromPlanContext,
   ResourceAdapter,
   ResourceExecutablePlanNode,
-} from "../resource-adapter-registry.js";
+} from "../services/resource-adapter-registry.js";
 import {
   managedMetadata,
   polarIdRef,

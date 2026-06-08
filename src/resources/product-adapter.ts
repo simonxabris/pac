@@ -12,12 +12,12 @@ import type {
   ProductUpdateOperationPayload,
   ProductUpdatePricePayload,
 } from "../operations/payloads/product.js";
-import type { Diagnostic, FieldChange } from "../planner.js";
+import type { Diagnostic, FieldChange } from "../services/planner.js";
 import type {
   CreateOperationsFromPlanContext,
   ResourceAdapter,
   ResourceExecutablePlanNode,
-} from "../resource-adapter-registry.js";
+} from "../services/resource-adapter-registry.js";
 import {
   managedMetadata,
   polarIdRef,

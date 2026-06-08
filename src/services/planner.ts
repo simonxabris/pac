@@ -1,8 +1,8 @@
 import { Effect, Layer, Schema } from "effect";
 import * as Context from "effect/Context";
-import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
-import type { ResourceKind } from "./core/kind.js";
-import type { CurrentResource, DesiredResource } from "./core/resource.js";
+import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
+import type { ResourceKind } from "../core/kind.js";
+import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import {
   MissingResourceAdapter,
   ResourceAdapterPlanError,

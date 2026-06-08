@@ -5,7 +5,7 @@ import {
   identityForKind,
   MetadataRecord,
   type ManagedIdentity,
-} from "../remote-resource-fetcher.js";
+} from "../services/remote-resource-fetcher.js";
 import { errorMessage, hasPaacMetadata } from "../utils.js";
 
 const ManagedIdentitySchema = Schema.Struct({

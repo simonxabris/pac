@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { OperationPlanner, PlanNotExecutable } from "./operation-planner.js";
-import type { Operation } from "./operations/operation.js";
+import type { Operation } from "../operations/operation.js";
 import type {
   ResourceAddress,
-} from "./core/address.js";
-import type { ResourceKind } from "./core/kind.js";
-import type { CurrentResource, DesiredResource } from "./core/resource.js";
+} from "../core/address.js";
+import type { ResourceKind } from "../core/kind.js";
+import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import type {
   BlockedPlanNode,
   CreatePlanNode,
@@ -20,9 +20,9 @@ import type {
   FieldChange,
 } from "./planner.js";
 import { ResourceAdapterRegistryLive } from "./resource-adapters.js";
-import type { BenefitSpec } from "./resources/benefit.js";
-import type { MeterSpec } from "./resources/meter.js";
-import type { CurrentProductProviderState, ProductSpec } from "./resources/product.js";
+import type { BenefitSpec } from "../resources/benefit.js";
+import type { MeterSpec } from "../resources/meter.js";
+import type { CurrentProductProviderState, ProductSpec } from "../resources/product.js";
 
 // --- Plan construction helpers ---
 

@@ -11,7 +11,7 @@ import {
   remoteMeterToSpec,
   remoteProductToSpec,
   type PolarInventory,
-} from "../remote-resource-fetcher.js";
+} from "../services/remote-resource-fetcher.js";
 import type { BenefitAddress, BenefitSpec } from "../resources/benefit.js";
 import type { MeterAddress, MeterSpec } from "../resources/meter.js";
 import type { ProductSpec } from "../resources/product.js";
