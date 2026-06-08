@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -6,13 +6,13 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 export type AppConfigShape = {
-  readonly polarAccessToken: Redacted.Redacted<string>;
+  readonly polarAccessToken?: Redacted.Redacted<string>;
   readonly polarEnv: "production" | "sandbox";
   readonly polarServerUrl: string | undefined;
 };
 
 const config = {
-  polarAccessToken: Config.redacted("POLAR_ACCESS_TOKEN"),
+  polarAccessToken: Config.redacted("POLAR_ACCESS_TOKEN").pipe(Config.option),
   polarEnv: Config.schema(
     Schema.Union([Schema.Literal("production"), Schema.Literal("sandbox")]),
     "POLAR_ENV",
@@ -25,7 +25,13 @@ export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()("@pa
     AppConfig,
     Effect.gen(function*() {
       const values = yield* Config.all(config);
-      return AppConfig.of(values);
+      return AppConfig.of({
+        ...(Option.isSome(values.polarAccessToken)
+          ? { polarAccessToken: values.polarAccessToken.value }
+          : {}),
+        polarEnv: values.polarEnv,
+        polarServerUrl: values.polarServerUrl,
+      });
     }),
   );
 

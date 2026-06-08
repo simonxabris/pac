@@ -8,6 +8,8 @@ import * as Command from "effect/unstable/cli/Command";
 import { deployCommand } from "./commands/deploy.js";
 import { generateCommand, GenerateCommand } from "./commands/generate.js";
 import { importCommand, ImportCommand } from "./commands/import.js";
+import { loginCommand } from "./commands/login.js";
+import { logoutCommand } from "./commands/logout.js";
 import { planCommand } from "./commands/plan.js";
 import { ConfigLoader } from "./services/config-loader.js";
 import { AppConfig } from "./services/app-config.js";
@@ -15,13 +17,14 @@ import { Executor } from "./services/executor.js";
 import { CodeGenerator } from "./services/code-generator.js";
 import { ResourceAdopter } from "./services/resource-adopter.js";
 import { OperationPlanner } from "./services/operation-planner.js";
+import { OAuth } from "./services/oauth.js";
 import { Planner } from "./services/planner.js";
 import { PolarClient } from "./services/polar-client.js";
 import { RemoteResourceFetcher } from "./services/remote-resource-fetcher.js";
 import { Renderer } from "./services/renderer.js";
 import { ResourceAdapterRegistryLive } from "./services/resource-adapters.js";
 
-const PolarClientLive = PolarClient.layer.pipe(Layer.provide(AppConfig.layer));
+const PolarClientLive = PolarClient.layer.pipe(Layer.provide(Layer.mergeAll(AppConfig.layer, OAuth.layer)));
 
 const CliBaseLive = Layer.mergeAll(
   Planner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive)),
@@ -31,6 +34,7 @@ const CliBaseLive = Layer.mergeAll(
   Renderer.layer,
   CodeGenerator.layer,
   ConfigLoader.layer,
+  OAuth.layer,
 );
 
 const ResourceAdopterLive = ResourceAdopter.layer.pipe(Layer.provide(PolarClientLive));
@@ -46,7 +50,14 @@ const CliLive = Layer.mergeAll(
 
 const cli = Command.make("paac").pipe(
   Command.withDescription("Polar as code"),
-  Command.withSubcommands([planCommand, deployCommand, generateCommand, importCommand]),
+  Command.withSubcommands([
+    planCommand,
+    deployCommand,
+    generateCommand,
+    importCommand,
+    loginCommand,
+    logoutCommand,
+  ]),
 );
 
 Command.run(cli, { version: "1.0.0" }).pipe(
