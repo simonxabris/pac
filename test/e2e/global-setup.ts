@@ -1,8 +1,29 @@
-import { e2eOrganizationFromEnv } from "./helpers/env.js";
+import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+
+const bootstrapE2EOrganization = async (): Promise<void> =>
+  new Promise((resolveBootstrap, reject) => {
+    const child = spawn(
+      process.execPath,
+      ["--import", "tsx", resolve(process.cwd(), "scripts/polar-docker-bootstrap-e2e.ts")],
+      {
+        cwd: process.cwd(),
+        env: process.env,
+        stdio: "inherit",
+      },
+    );
+
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolveBootstrap();
+        return;
+      }
+
+      reject(new Error(`E2E Polar bootstrap failed with code ${code ?? "null"} signal ${signal ?? "null"}`));
+    });
+  });
 
 export default async function setup() {
-  // E2E setup is intentionally minimal: callers provide the Polar API URL and
-  // an organization access token. Tests run in that organization; setup does
-  // not create or destroy any Polar resources outside the test cases.
-  e2eOrganizationFromEnv();
+  await bootstrapE2EOrganization();
 }
