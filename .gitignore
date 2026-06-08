@@ -151,4 +151,5 @@ tsconfig.tsbuildinfo
 sst/
 alchemy-effect/
 
+.polar-e2e/
 .agents/
