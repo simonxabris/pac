@@ -59,4 +59,4 @@ You can also set `POLAR_ENV` to choose which environment to connect to:
 
 - Product with all supported pricing strategies
 - Meter with all possible filtering and aggregation
-- Benefit with only `meter-credit` type.
+- Benefits with `meter-credit`, `custom`, and `feature-flag` types.

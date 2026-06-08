@@ -6,6 +6,7 @@ import {
   type CurrencyAmountInput,
 } from "./currency/currency.js";
 import type { ResourceKind } from "./core/kind.js";
+import { PAAC_METADATA_KEY } from "./core/metadata.js";
 import type { CurrentResource } from "./core/resource.js";
 import type { ImportModel } from "./import/project.js";
 import type { Plan } from "./planner.js";
@@ -50,7 +51,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
 
 const removePaacMetadata = (metadata: Record<string, unknown>): Record<string, unknown> => {
-  const { paac: _paac, ...rest } = metadata;
+  const { [PAAC_METADATA_KEY]: _paac, ...rest } = metadata;
   return rest;
 };
 
@@ -384,6 +385,15 @@ const renderBenefitConfig = (
           ["type", renderConfigValue("custom", level + 1)],
           ["description", renderConfigValue(spec.description, level + 1)],
           ["note", renderConfigValue(spec.note, level + 1)],
+        ],
+        level,
+      );
+    case "feature-flag":
+      return renderObjectEntries(
+        [
+          ["type", renderConfigValue("feature-flag", level + 1)],
+          ["description", renderConfigValue(spec.description, level + 1)],
+          ["metadata", renderConfigValue(spec.metadata, level + 1)],
         ],
         level,
       );

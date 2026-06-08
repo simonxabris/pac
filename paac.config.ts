@@ -24,10 +24,10 @@ export const pro = new Product("pro", {
   name: "Paac Pro plan",
   description: "For serious users",
   prices: [
-    fixedPrice({ amount: "30", currency: "usd" }),
+    fixedPrice({ amount: "40", currency: "usd" }),
     meteredUnitPrice({ meter: tokens, amount: "0.001", currency: "usd", capAmount: "100" }),
   ],
-  recurringIntervalCount: 1,
+  recurringIntervalCount: 3,
   recurringInterval: "month",
   benefits: [includedTokens, customBenefit],
 });

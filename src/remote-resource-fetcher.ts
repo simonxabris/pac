@@ -9,12 +9,14 @@ import {
   polarIntegerMinorUnitNumber,
 } from "./currency//currency.js";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "./core/address.js";
+import { PAAC_METADATA_KEY } from "./core/metadata.js";
 import type { CurrentResource } from "./core/resource.js";
 import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "./polar/client.js";
 import { PolarClient } from "./polar/service.js";
 import {
   BenefitSpecSchema,
   CurrentBenefitResourceSchema,
+  normalizeBenefitMetadata,
   type BenefitAddress,
   type BenefitSpec,
   type CurrentBenefitResource,
@@ -168,7 +170,20 @@ const RemoteBenefitCustomSdk = Schema.Struct({
   }),
 });
 
-export const RemoteBenefitSdk = Schema.Union([RemoteBenefitMeterCreditSdk, RemoteBenefitCustomSdk]);
+const RemoteBenefitFeatureFlagSdk = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("feature_flag"),
+  description: Schema.String,
+  isDeleted: Schema.Boolean,
+  metadata: MetadataRecord,
+  properties: Schema.Struct({}),
+});
+
+export const RemoteBenefitSdk = Schema.Union([
+  RemoteBenefitMeterCreditSdk,
+  RemoteBenefitCustomSdk,
+  RemoteBenefitFeatureFlagSdk,
+]);
 
 export const RemoteBenefitResourceInput = Schema.Struct({
   benefit: RemoteBenefitSdk,
@@ -191,7 +206,7 @@ const schemaIssue = (actual: unknown, message: string): SchemaIssue.Issue =>
   new SchemaIssue.InvalidValue(Option.some(actual), { message });
 
 export const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
-  const value = metadata.paac;
+  const value = metadata[PAAC_METADATA_KEY];
   if (typeof value !== "string") {
     throw new Error("Remote resource does not contain PAAC metadata.");
   }
@@ -218,6 +233,11 @@ export const identityForKind = (
     throw new Error(`Expected PAAC metadata kind '${kind}', got '${identity.kind}'.`);
   }
   return identity;
+};
+
+const stripPaacMetadata = (metadata: typeof MetadataRecord.Type) => {
+  const { [PAAC_METADATA_KEY]: _paac, ...userMetadata } = metadata;
+  return normalizeBenefitMetadata(userMetadata as Record<string, string | number | boolean>);
 };
 
 const productPriceToSpec = (
@@ -409,6 +429,12 @@ export const remoteBenefitToSpec = ({
         description: benefit.description,
         note: benefit.properties.note,
       });
+    case "feature_flag":
+      return Schema.decodeUnknownSync(BenefitSpecSchema)({
+        type: "feature-flag",
+        description: benefit.description,
+        metadata: stripPaacMetadata(benefit.metadata),
+      });
   }
 };
 
@@ -459,6 +485,18 @@ const benefitResourceToRemoteInput = (
           isDeleted: resource.isRemoved,
           metadata: {},
           properties: { note: resource.spec.note },
+        },
+        meterAddressesById: {},
+      };
+    case "feature-flag":
+      return {
+        benefit: {
+          id: resource.polarId,
+          type: "feature_flag",
+          description: resource.spec.description,
+          isDeleted: resource.isRemoved,
+          metadata: resource.spec.metadata,
+          properties: {},
         },
         meterAddressesById: {},
       };

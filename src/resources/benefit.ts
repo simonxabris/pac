@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { makeAddress, type ResourceAddress } from "../core/address.js";
+import { PAAC_METADATA_KEY } from "../core/metadata.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import { MeterAddressSchema, type Meter, type MeterAddress } from "./meter.js";
 import { registerResource } from "./registry.js";
@@ -24,7 +25,19 @@ export type CustomBenefitConfig = {
   readonly note?: string | null;
 };
 
-export type BenefitConfig = MeterCreditBenefitConfig | CustomBenefitConfig;
+export type BenefitMetadataValue = string | number | boolean;
+export type BenefitMetadata = Readonly<Record<string, BenefitMetadataValue>>;
+
+export type FeatureFlagBenefitConfig = {
+  readonly type: "feature-flag";
+  readonly description: string;
+  readonly metadata?: BenefitMetadata;
+};
+
+export type BenefitConfig =
+  | MeterCreditBenefitConfig
+  | CustomBenefitConfig
+  | FeatureFlagBenefitConfig;
 
 export type BenefitMeterCreditSpec = {
   readonly type: "meter-credit";
@@ -40,7 +53,13 @@ export type BenefitCustomSpec = {
   readonly note: string | null;
 };
 
-export type BenefitSpec = BenefitMeterCreditSpec | BenefitCustomSpec;
+export type BenefitFeatureFlagSpec = {
+  readonly type: "feature-flag";
+  readonly description: string;
+  readonly metadata: BenefitMetadata;
+};
+
+export type BenefitSpec = BenefitMeterCreditSpec | BenefitCustomSpec | BenefitFeatureFlagSpec;
 
 export type BenefitResource = DesiredResource<BenefitKind, BenefitSpec>;
 export type CurrentBenefitResource = CurrentResource<BenefitKind, BenefitSpec>;
@@ -52,6 +71,68 @@ const BenefitDescriptionSchema = Schema.String.pipe(
 const BenefitUnitsSchema = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 2_147_483_647 })),
 );
+
+export const BenefitMetadataValueSchema = Schema.Union([
+  Schema.String,
+  Schema.Number,
+  Schema.Boolean,
+]);
+export const BenefitMetadataSchema = Schema.Record(Schema.String, BenefitMetadataValueSchema);
+
+export const normalizeBenefitMetadata = (metadata: BenefitMetadata = {}): BenefitMetadata => {
+  const entries = Object.entries(metadata);
+
+  if (entries.length > 49) {
+    throw new Error(
+      "Feature Flag Benefit metadata may contain at most 49 entries; PAAC reserves one metadata slot.",
+    );
+  }
+
+  const normalized: Record<string, BenefitMetadataValue> = {};
+
+  for (const [key, value] of entries.sort(([left], [right]) => left.localeCompare(right))) {
+    if (key.length === 0) {
+      throw new Error("Feature Flag Benefit metadata keys must not be empty.");
+    }
+    if (key.length > 40) {
+      throw new Error("Feature Flag Benefit metadata keys must be at most 40 characters.");
+    }
+    if (key === PAAC_METADATA_KEY) {
+      throw new Error(
+        `Feature Flag Benefit metadata key '${PAAC_METADATA_KEY}' is reserved by PAAC.`,
+      );
+    }
+
+    switch (typeof value) {
+      case "string":
+        if (value.length === 0) {
+          throw new Error("Feature Flag Benefit metadata string values must not be empty.");
+        }
+        if (value.length > 500) {
+          throw new Error(
+            "Feature Flag Benefit metadata string values must be at most 500 characters.",
+          );
+        }
+        normalized[key] = value;
+        break;
+      case "number":
+        if (!Number.isFinite(value)) {
+          throw new Error("Feature Flag Benefit metadata number values must be finite.");
+        }
+        normalized[key] = value;
+        break;
+      case "boolean":
+        normalized[key] = value;
+        break;
+      default:
+        throw new Error(
+          "Feature Flag Benefit metadata values must be strings, numbers, or booleans.",
+        );
+    }
+  }
+
+  return normalized;
+};
 
 export const BenefitMeterCreditSpecSchema = Schema.Struct({
   type: Schema.Literal("meter-credit"),
@@ -67,9 +148,16 @@ export const BenefitCustomSpecSchema = Schema.Struct({
   note: Schema.NullOr(Schema.String),
 });
 
+export const BenefitFeatureFlagSpecSchema = Schema.Struct({
+  type: Schema.Literal("feature-flag"),
+  description: BenefitDescriptionSchema,
+  metadata: BenefitMetadataSchema,
+});
+
 export const BenefitSpecSchema: Schema.Codec<BenefitSpec> = Schema.Union([
   BenefitMeterCreditSpecSchema,
   BenefitCustomSpecSchema,
+  BenefitFeatureFlagSpecSchema,
 ]);
 
 export const BenefitResourceSchema = Schema.Struct({
@@ -115,6 +203,12 @@ export const benefitSpec = (config: BenefitConfig): BenefitSpec => {
         type: "custom",
         description: config.description,
         note: config.note ?? null,
+      });
+    case "feature-flag":
+      return decodeBenefitSpec({
+        type: "feature-flag",
+        description: config.description,
+        metadata: normalizeBenefitMetadata(config.metadata ?? {}),
       });
   }
 };

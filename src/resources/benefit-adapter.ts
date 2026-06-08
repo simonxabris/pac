@@ -5,8 +5,10 @@ import type { Operation } from "../operations/operation.js";
 import type {
   BenefitCreateOperationPayload,
   BenefitCustomUpdateOperationPayload,
+  BenefitFeatureFlagUpdateOperationPayload,
   BenefitMeterCreditPropertiesOperationPayload,
   BenefitMeterCreditUpdateOperationPayload,
+  BenefitOperationMetadata,
   BenefitUpdateOperationPayload,
 } from "../operations/payloads/benefit.js";
 import type { Diagnostic, FieldChange } from "../planner.js";
@@ -21,7 +23,12 @@ import {
   pushFieldChange,
   unsupportedRollback,
 } from "./adapter-utils.js";
-import type { BenefitKind, BenefitMeterCreditSpec, BenefitSpec } from "./benefit.js";
+import type {
+  BenefitKind,
+  BenefitMetadata,
+  BenefitMeterCreditSpec,
+  BenefitSpec,
+} from "./benefit.js";
 
 const assertNever = (value: never): never => {
   throw new Error(`Unexpected Benefit spec variant: ${JSON.stringify(value)}`);
@@ -32,6 +39,8 @@ const benefitDependencies = (spec: BenefitSpec): ReadonlyArray<ResourceAddress> 
     case "meter-credit":
       return [spec.meter];
     case "custom":
+      return [];
+    case "feature-flag":
       return [];
   }
 };
@@ -44,10 +53,18 @@ const benefitMeterCreditPropertiesPayload = (
   rollover: spec.rollover,
 });
 
+const benefitMetadataPayload = (
+  userMetadata: BenefitMetadata,
+  resource: { readonly kind: BenefitKind; readonly address: ResourceAddress; readonly key: string },
+): BenefitOperationMetadata => ({
+  ...userMetadata,
+  ...managedMetadata(resource.kind, resource.address, resource.key),
+});
+
 const benefitCreatePayload = (
   node: ResourceExecutablePlanNode<BenefitKind, BenefitSpec> & { readonly _tag: "Create" },
 ): BenefitCreateOperationPayload => {
-  const metadata = managedMetadata(node.kind, node.address, node.desired.key);
+  const metadata = benefitMetadataPayload({}, node.desired);
 
   switch (node.desired.spec.type) {
     case "meter-credit":
@@ -64,6 +81,13 @@ const benefitCreatePayload = (
         description: node.desired.spec.description,
         properties: { note: node.desired.spec.note },
       };
+    case "feature-flag":
+      return {
+        metadata: benefitMetadataPayload(node.desired.spec.metadata, node.desired),
+        type: "feature_flag",
+        description: node.desired.spec.description,
+        properties: {},
+      };
   }
 };
 
@@ -75,9 +99,16 @@ const hasChanged = (changes: ReadonlyArray<FieldChange>, field: BenefitSpecField
   changes.some((change) => change.path[0] === field);
 
 const benefitUpdatePayload = (
-  spec: BenefitSpec,
+  resource: {
+    readonly kind: BenefitKind;
+    readonly address: ResourceAddress;
+    readonly key: string;
+    readonly spec: BenefitSpec;
+  },
   changes: ReadonlyArray<FieldChange>,
 ): BenefitUpdateOperationPayload => {
+  const { spec } = resource;
+
   switch (spec.type) {
     case "meter-credit": {
       const payload: BenefitMeterCreditUpdateOperationPayload = { type: "meter_credit" };
@@ -86,7 +117,11 @@ const benefitUpdatePayload = (
         payload.description = spec.description;
       }
 
-      if (hasChanged(changes, "meter") || hasChanged(changes, "units") || hasChanged(changes, "rollover")) {
+      if (
+        hasChanged(changes, "meter") ||
+        hasChanged(changes, "units") ||
+        hasChanged(changes, "rollover")
+      ) {
         payload.properties = benefitMeterCreditPropertiesPayload(spec);
       }
 
@@ -101,6 +136,19 @@ const benefitUpdatePayload = (
 
       if (hasChanged(changes, "note")) {
         payload.properties = { note: spec.note };
+      }
+
+      return payload;
+    }
+    case "feature-flag": {
+      const payload: BenefitFeatureFlagUpdateOperationPayload = { type: "feature_flag" };
+
+      if (hasChanged(changes, "description")) {
+        payload.description = spec.description;
+      }
+
+      if (hasChanged(changes, "metadata")) {
+        payload.metadata = benefitMetadataPayload(spec.metadata, resource);
       }
 
       return payload;
@@ -137,7 +185,7 @@ const createBenefitOperationFromPlanNode = (
       const action: OperationAction = {
         _tag: "UpdateBenefit",
         id: node.current.polarId,
-        payload: benefitUpdatePayload(node.desired.spec, node.changes),
+        payload: benefitUpdatePayload(node.desired, node.changes),
       };
 
       return {
@@ -151,7 +199,7 @@ const createBenefitOperationFromPlanNode = (
           action: {
             _tag: "UpdateBenefit",
             id: node.current.polarId,
-            payload: benefitUpdatePayload(node.current.spec, node.changes),
+            payload: benefitUpdatePayload(node.current, node.changes),
           },
         },
       };
@@ -166,7 +214,9 @@ const createBenefitOperationFromPlanNode = (
           _tag: "DeleteBenefit",
           id: node.current.polarId,
         },
-        rollback: unsupportedRollback("Delete rollback is not implemented because revoked grants cannot be restored."),
+        rollback: unsupportedRollback(
+          "Delete rollback is not implemented because revoked grants cannot be restored.",
+        ),
       };
   }
 };
@@ -225,6 +275,14 @@ export const BenefitResourceAdapter: ResourceAdapter<BenefitKind, BenefitSpec> =
           }
 
           pushFieldChange(changes, ["note"], current.spec.note, desired.spec.note);
+          break;
+        }
+        case "feature-flag": {
+          if (current.spec.type !== "feature-flag") {
+            throw new Error("Benefit type mismatch after immutable-type check.");
+          }
+
+          pushFieldChange(changes, ["metadata"], current.spec.metadata, desired.spec.metadata);
           break;
         }
         default:
