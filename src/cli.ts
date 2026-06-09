@@ -38,15 +38,14 @@ const ResourceCommandBaseLive = Layer.mergeAll(
 
 const ResourceAdopterLive = ResourceAdopter.layer.pipe(Layer.provide(PolarClientLive));
 
-const ResourceCommandLive = Layer.mergeAll(
+const ResourceCommandDependenciesLive = Layer.mergeAll(
   ResourceCommandBaseLive,
   ResourceAdopterLive,
-  GenerateCommand.layer.pipe(
-    Layer.provide(Layer.mergeAll(ResourceCommandBaseLive, NodeServices.layer)),
-  ),
-  ImportCommand.layer.pipe(
-    Layer.provide(Layer.mergeAll(ResourceCommandBaseLive, ResourceAdopterLive, NodeServices.layer)),
-  ),
+  NodeServices.layer,
+);
+
+const ResourceCommandLive = Layer.mergeAll(GenerateCommand.layer, ImportCommand.layer).pipe(
+  Layer.provideMerge(ResourceCommandDependenciesLive),
 );
 
 const planCommandLive = planCommand.pipe(Command.provide(ResourceCommandLive));
