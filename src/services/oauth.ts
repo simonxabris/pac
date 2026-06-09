@@ -77,7 +77,7 @@ export type OAuthShape = {
   ) => Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment>;
   readonly resolveSelectedOrganization: (
     server: PolarEnvironment,
-  ) => Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment>;
+  ) => Effect.Effect<SelectedOrganization, OAuthError>;
 };
 
 export class OAuthError extends Schema.TaggedErrorClass<OAuthError>()("OAuthError", {
@@ -437,10 +437,18 @@ const selectOrganization = (
 
 const resolveSelectedOrganization = (
   server: PolarEnvironment,
-): Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment> =>
+): Effect.Effect<SelectedOrganization, OAuthError> =>
   Effect.gen(function*() {
     const organization = yield* getSelectedOrganization(server);
-    return yield* organization ? Effect.succeed(organization) : selectOrganization(server);
+
+    if (!organization) {
+      return yield* new OAuthError({
+        message: `No Polar organization selected for ${server}. Run "paac auth org --env ${server}" to select an organization.`,
+        cause: undefined,
+      });
+    }
+
+    return organization;
   });
 
 const captureAccessTokenFromHTTPServer = (
