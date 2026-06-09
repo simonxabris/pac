@@ -9,6 +9,7 @@ import { deployCommand } from "./commands/deploy.js";
 import { generateCommand, GenerateCommand } from "./commands/generate.js";
 import { importCommand, ImportCommand } from "./commands/import.js";
 import { authCommand } from "./commands/auth.js";
+import { polarRuntimeEnvFlag } from "./commands/options.js";
 import { planCommand } from "./commands/plan.js";
 import { ConfigLoader } from "./services/config-loader.js";
 import { AppConfig } from "./services/app-config.js";
@@ -23,9 +24,9 @@ import { RemoteResourceFetcher } from "./services/remote-resource-fetcher.js";
 import { Renderer } from "./services/renderer.js";
 import { ResourceAdapterRegistryLive } from "./services/resource-adapters.js";
 
-const PolarClientLive = PolarClient.layer.pipe(Layer.provide(Layer.mergeAll(AppConfig.layer, OAuth.layer)));
+const PolarClientLive = PolarClient.layer;
 
-const CliBaseLive = Layer.mergeAll(
+const ResourceCommandBaseLive = Layer.mergeAll(
   Planner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive)),
   OperationPlanner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive)),
   RemoteResourceFetcher.layer.pipe(Layer.provide(PolarClientLive)),
@@ -33,32 +34,41 @@ const CliBaseLive = Layer.mergeAll(
   Renderer.layer,
   CodeGenerator.layer,
   ConfigLoader.layer,
-  OAuth.layer,
 );
 
 const ResourceAdopterLive = ResourceAdopter.layer.pipe(Layer.provide(PolarClientLive));
 
-const CliLive = Layer.mergeAll(
-  CliBaseLive,
+const ResourceCommandLive = Layer.mergeAll(
+  ResourceCommandBaseLive,
   ResourceAdopterLive,
-  GenerateCommand.layer.pipe(Layer.provide(Layer.mergeAll(CliBaseLive, NodeServices.layer))),
+  GenerateCommand.layer.pipe(
+    Layer.provide(Layer.mergeAll(ResourceCommandBaseLive, NodeServices.layer)),
+  ),
   ImportCommand.layer.pipe(
-    Layer.provide(Layer.mergeAll(CliBaseLive, ResourceAdopterLive, NodeServices.layer)),
+    Layer.provide(Layer.mergeAll(ResourceCommandBaseLive, ResourceAdopterLive, NodeServices.layer)),
   ),
 );
 
+const planCommandLive = planCommand.pipe(Command.provide(ResourceCommandLive));
+const deployCommandLive = deployCommand.pipe(Command.provide(ResourceCommandLive));
+const generateCommandLive = generateCommand.pipe(Command.provide(ResourceCommandLive));
+const importCommandLive = importCommand.pipe(Command.provide(ResourceCommandLive));
+const authCommandLive = authCommand;
+
 const cli = Command.make("paac").pipe(
+  Command.withSharedFlags({ env: polarRuntimeEnvFlag }),
   Command.withDescription("Polar as code"),
   Command.withSubcommands([
-    planCommand,
-    deployCommand,
-    generateCommand,
-    importCommand,
-    authCommand,
+    planCommandLive,
+    deployCommandLive,
+    generateCommandLive,
+    importCommandLive,
+    authCommandLive,
   ]),
+  Command.provide(({ env }) => Layer.mergeAll(AppConfig.layerWithCliEnv(env), OAuth.layer)),
 );
 
 Command.run(cli, { version: "1.0.0" }).pipe(
-  Effect.provide(Layer.mergeAll(CliLive, NodeServices.layer)),
+  Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,
 );

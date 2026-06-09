@@ -1,18 +1,19 @@
 import { Console } from "effect";
 import * as Effect from "effect/Effect";
 import * as Command from "effect/unstable/cli/Command";
-import { OAuth, type PolarEnvironment } from "../services/oauth.js";
-import { polarEnvFlag } from "./options.js";
+import { AppConfig } from "../services/app-config.js";
+import { OAuth } from "../services/oauth.js";
 
-const loginCommand = Command.make("login", { env: polarEnvFlag }, ({ env }) =>
+const loginCommand = Command.make("login", {}, () =>
   Effect.gen(function*() {
-    const server = env as PolarEnvironment;
+    const config = yield* AppConfig;
+    const server = config.polarEnv;
     const oauth = yield* OAuth;
     const token = yield* oauth.login(server);
     const organization = yield* oauth.selectOrganization(server);
     const user = token.user?.email ?? token.user?.name ?? token.user?.id ?? "unknown user";
     yield* Console.log(
-      `Successfully logged into Polar ${env} as ${user} with organization ${organization.name} (${organization.slug})`,
+      `Successfully logged into Polar ${server} as ${user} with organization ${organization.name} (${organization.slug})`,
     );
   }),
 ).pipe(Command.withDescription("Log in to Polar with OAuth"));
@@ -25,9 +26,10 @@ const logoutCommand = Command.make("logout", {}, () =>
   }),
 ).pipe(Command.withDescription("Log out of Polar"));
 
-const whoamiCommand = Command.make("whoami", { env: polarEnvFlag }, ({ env }) =>
+const whoamiCommand = Command.make("whoami", {}, () =>
   Effect.gen(function*() {
-    const server = env;
+    const config = yield* AppConfig;
+    const server = config.polarEnv;
     const oauth = yield* OAuth;
     const authenticated = yield* oauth.isAuthenticated(server);
 
@@ -49,9 +51,10 @@ const whoamiCommand = Command.make("whoami", { env: polarEnvFlag }, ({ env }) =>
   }),
 ).pipe(Command.withDescription("Show the current Polar login and selected organization"));
 
-const orgCommand = Command.make("org", { env: polarEnvFlag }, ({ env }) =>
+const orgCommand = Command.make("org", {}, () =>
   Effect.gen(function*() {
-    const server = env;
+    const config = yield* AppConfig;
+    const server = config.polarEnv;
     const oauth = yield* OAuth;
     const authenticated = yield* oauth.isAuthenticated(server);
 
