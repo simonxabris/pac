@@ -1,5 +1,15 @@
 import * as Flag from "effect/unstable/cli/Flag";
 
+export const polarEnvFlag = Flag.choice("env", ["production", "sandbox"] as const).pipe(
+  Flag.withDefault("sandbox"),
+  Flag.withDescription("Polar environment to authenticate against"),
+);
+
+export const polarRuntimeEnvFlag = Flag.choice("env", ["production", "sandbox"] as const).pipe(
+  Flag.withDefault("production"),
+  Flag.withDescription("Polar environment to run against. POLAR_ENV takes precedence when set."),
+);
+
 export const configFlag = Flag.string("config").pipe(
   Flag.withDefault("paac.config.ts"),
   Flag.withDescription("Path to the PAAC config file to load"),

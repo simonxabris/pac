@@ -9,6 +9,7 @@ import type { BenefitsUpdateBenefitUpdate } from "@polar-sh/sdk/models/operation
 import { Effect, Layer, Redacted, Schema } from "effect";
 import * as Context from "effect/Context";
 import { AppConfig } from "./app-config.js";
+import { OAuth } from "./oauth.js";
 import { errorMessage } from "../utils.js";
 import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
 
@@ -50,7 +51,7 @@ export class PolarClientError extends Schema.TaggedErrorClass<PolarClientError>(
     operation: Schema.String,
     message: Schema.String,
   },
-) {}
+) { }
 
 const fromPromise = <A>(
   operation: string,
@@ -66,17 +67,31 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
 ) {
   static readonly layer = Layer.effect(
     PolarClient,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const config = yield* AppConfig;
+      let accessToken = config.polarAccessToken;
+      let organizationId: string | undefined;
+
+      if (!accessToken) {
+        const oauth = yield* OAuth;
+        const token = yield* oauth.resolveAccessToken(config.polarEnv);
+        const organization = yield* oauth.resolveSelectedOrganization(config.polarEnv);
+        accessToken = token.token;
+        organizationId = organization.id;
+      }
+
+      const withOrganizationId = <A extends object>(payload: A): A & { organizationId?: string } =>
+        organizationId ? { ...payload, organizationId } : payload;
+
       const sdk = new Polar({
-        accessToken: Redacted.value(config.polarAccessToken),
+        accessToken: Redacted.value(accessToken),
         server: config.polarEnv,
         serverURL: config.polarServerUrl,
       });
 
       const listBenefits = Effect.fn("PolarClient.listBenefits")(() =>
         fromPromise("benefits.list", async () => {
-          const iterator = await sdk.benefits.list({ limit: 100 });
+          const iterator = await sdk.benefits.list(withOrganizationId({ limit: 100 }));
           const benefits: Array<RemoteBenefit> = [];
           for await (const page of iterator) {
             benefits.push(...page.result.items);
@@ -86,7 +101,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
       );
 
       const createBenefit = Effect.fn("PolarClient.createBenefit")((payload: BenefitCreate) =>
-        fromPromise("benefits.create", () => sdk.benefits.create(payload)),
+        fromPromise("benefits.create", () => sdk.benefits.create(withOrganizationId(payload))),
       );
 
       const updateBenefit = Effect.fn("PolarClient.updateBenefit")(
@@ -100,7 +115,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
 
       const listProducts = Effect.fn("PolarClient.listProducts")(() =>
         fromPromise("products.list", async () => {
-          const iterator = await sdk.products.list({ limit: 100 });
+          const iterator = await sdk.products.list(withOrganizationId({ limit: 100 }));
           const products: Array<RemoteProduct> = [];
           for await (const page of iterator) {
             products.push(...page.result.items);
@@ -110,7 +125,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
       );
 
       const createProduct = Effect.fn("PolarClient.createProduct")((payload: ProductCreate) =>
-        fromPromise("products.create", () => sdk.products.create(payload)),
+        fromPromise("products.create", () => sdk.products.create(withOrganizationId(payload))),
       );
 
       const updateProduct = Effect.fn("PolarClient.updateProduct")(
@@ -134,7 +149,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
 
       const listMeters = Effect.fn("PolarClient.listMeters")(() =>
         fromPromise("meters.list", async () => {
-          const iterator = await sdk.meters.list({ limit: 100 });
+          const iterator = await sdk.meters.list(withOrganizationId({ limit: 100 }));
           const meters: Array<RemoteMeter> = [];
           for await (const page of iterator) {
             meters.push(...page.result.items);
@@ -144,7 +159,7 @@ export class PolarClient extends Context.Service<PolarClient, PolarClientShape>(
       );
 
       const createMeter = Effect.fn("PolarClient.createMeter")((payload: MeterCreate) =>
-        fromPromise("meters.create", () => sdk.meters.create(payload)),
+        fromPromise("meters.create", () => sdk.meters.create(withOrganizationId(payload))),
       );
 
       const updateMeter = Effect.fn("PolarClient.updateMeter")((id: string, payload: MeterUpdate) =>

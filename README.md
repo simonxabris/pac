@@ -46,14 +46,40 @@ run the `deploy` command to create the resources.
 
 # Authentication
 
-Set the following environment variable to authenticate with Polar:
+`paac` supports two ways to authenticate with Polar:
 
-- `POLAR_ACCESS_TOKEN` — your Polar API access token.
+## OAuth
 
-You can also set `POLAR_ENV` to choose which environment to connect to:
+Use the built-in OAuth flow to log in interactively. This stores tokens securely in your system keyring and prompts you to select an organization.
 
-- `production` — connects to the live Polar API.
-- `sandbox` — connects to the Polar sandbox API.
+```sh
+# Log in (opens your browser)
+paac auth login
+
+# Check who you're logged in as and which organization is active
+paac auth whoami
+
+# Switch to a different organization
+paac auth org
+
+# Log out and clear stored credentials
+paac auth logout
+```
+
+Tokens are scoped per environment (`production` or `sandbox`). The login command stores the access token and your selected organization in the system keyring so you don't have to re-authenticate on every run.
+
+## Environment variable
+
+Set `POLAR_ACCESS_TOKEN` to authenticate with a Polar API access token directly. When this variable is present, OAuth is skipped entirely.
+
+```sh
+export POLAR_ACCESS_TOKEN="polar_at_..."
+```
+
+You can also control the target environment:
+
+- `POLAR_ENV` — `production` (default) or `sandbox`.
+- `POLAR_SERVER_URL` — optional custom Polar API base URL.
 
 # Supported
 

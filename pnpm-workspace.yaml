@@ -2,6 +2,7 @@ packages:
   - .
   - "!alchemy-effect/**"
   - "!sst/**"
+  - "!old-polar-cli/**"
 
 onlyBuiltDependencies:
   - esbuild
