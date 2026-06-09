@@ -9,7 +9,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import { errorMessage } from "../utils.js";
 
 export type PolarEnvironment = "production" | "sandbox";
 
@@ -31,6 +30,7 @@ export const Token = Schema.Struct({
   scope: TokenScope,
   server: Schema.Union([Schema.Literal("production"), Schema.Literal("sandbox")]),
 });
+
 export type Token = Schema.Schema.Type<typeof Token>;
 
 export const Tokens = Schema.Struct({
@@ -50,6 +50,7 @@ export type OAuthShape = {
 
 export class OAuthError extends Schema.TaggedErrorClass<OAuthError>()("OAuthError", {
   message: Schema.String,
+  cause: Schema.Defect(),
 }) { }
 
 const SANDBOX_CLIENT_ID = "polar_ci_AHVAKf9SDOaffma2auRGMXR3H8jg9QBgOfW7s1hYgW9";
@@ -137,23 +138,22 @@ const readToken = (server: PolarEnvironment): Effect.Effect<Token | undefined, O
   Effect.gen(function*() {
     const raw = yield* Effect.tryPromise({
       try: () => keyringEntry(server).getPassword(),
-      catch: (cause) =>
-        new OAuthError({ message: `Failed to read token from keyring: ${errorMessage(cause)}` }),
+      catch: (cause) => new OAuthError({ message: "Failed to read token from keyring", cause }),
     });
 
     if (!raw) return undefined;
 
     const parsed = yield* Effect.try({
       try: () => JSON.parse(raw) as unknown,
-      catch: (cause) =>
-        new OAuthError({ message: `Failed to parse token from keyring: ${errorMessage(cause)}` }),
+      catch: (cause) => new OAuthError({ message: "Failed to parse token from keyring", cause }),
     });
 
     return yield* Schema.decodeUnknownEffect(Token)(parsed).pipe(
       Effect.mapError(
         (cause) =>
           new OAuthError({
-            message: `Failed to decode token from keyring: ${errorMessage(cause)}`,
+            message: "Failed to decode token from keyring",
+            cause,
           }),
       ),
     );
@@ -172,14 +172,13 @@ const saveToken = (token: Token): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
     const encoded = yield* Schema.encodeUnknownEffect(Token)(token).pipe(
       Effect.mapError(
-        (cause) => new OAuthError({ message: `Failed to encode token: ${errorMessage(cause)}` }),
+        (cause) => new OAuthError({ message: "Failed to encode token", cause }),
       ),
     );
 
     yield* Effect.tryPromise({
       try: () => keyringEntry(token.server).setPassword(JSON.stringify(encoded)),
-      catch: (cause) =>
-        new OAuthError({ message: `Failed to save token to keyring: ${errorMessage(cause)}` }),
+      catch: (cause) => new OAuthError({ message: "Failed to save token to keyring", cause }),
     });
 
     return token;
@@ -190,8 +189,7 @@ const deleteToken = (server: PolarEnvironment): Effect.Effect<void, OAuthError> 
     try: async () => {
       await keyringEntry(server).deleteCredential();
     },
-    catch: (cause) =>
-      new OAuthError({ message: `Failed to delete token from keyring: ${errorMessage(cause)}` }),
+    catch: (cause) => new OAuthError({ message: "Failed to delete token from keyring", cause }),
   }).pipe(Effect.catch(() => Effect.void));
 
 const logout = (): Effect.Effect<void, OAuthError> =>
@@ -205,7 +203,10 @@ const getAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthErr
     const token = tokens[server];
 
     if (!token) {
-      return yield* new OAuthError({ message: "No access token found for the selected server" });
+      return yield* new OAuthError({
+        message: "No access token found for the selected server",
+        cause: undefined,
+      });
     }
 
     return token;
@@ -232,7 +233,7 @@ const isAuthenticated = (server: PolarEnvironment): Effect.Effect<boolean, OAuth
 const resolveAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
     const authenticated = yield* isAuthenticated(server);
-    return yield* (authenticated ? getAccessToken(server) : login(server));
+    return yield* authenticated ? getAccessToken(server) : login(server);
   });
 
 const captureAccessTokenFromHTTPServer = (
@@ -285,9 +286,7 @@ const captureAccessTokenFromHTTPServer = (
         completed = true;
         closeServer();
         resume(
-          Effect.fail(
-            new OAuthError({ message: `Temporary HTTP server failed: ${errorMessage(cause)}` }),
-          ),
+          Effect.fail(new OAuthError({ message: "Temporary HTTP server failed", cause })),
         );
       });
 
@@ -347,6 +346,7 @@ const getLoginResult = (
     if (!code || !state) {
       return yield* new OAuthError({
         message: "Authorization code or state is missing in the response URL",
+        cause: undefined,
       });
     }
 
@@ -358,7 +358,7 @@ const refreshAccessToken = (token: Token): Effect.Effect<Token, OAuthError> =>
     const refreshToken = token.refreshToken;
 
     if (!refreshToken) {
-      return yield* new OAuthError({ message: "No refresh token found" });
+      return yield* new OAuthError({ message: "No refresh token found", cause: undefined });
     }
 
     const { clientId } = getClientCredentials(token.server);
@@ -390,6 +390,7 @@ const redeemCodeForAccessToken = (
     if (responseState !== requestState) {
       return yield* new OAuthError({
         message: "An invalid authorization response state was received",
+        cause: undefined,
       });
     }
 
@@ -424,26 +425,24 @@ const postTokenRequest = (
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: params.toString(),
         }),
-      catch: (cause) =>
-        new OAuthError({ message: `Failed to ${operation}: ${errorMessage(cause)}` }),
+      catch: (cause) => new OAuthError({ message: `Failed to ${operation}`, cause }),
     });
 
     if (response.status >= 400) {
       const details = yield* Effect.tryPromise({
         try: () => response.text(),
-        catch: (cause) =>
-          new OAuthError({ message: `Failed to read token response: ${errorMessage(cause)}` }),
+        catch: (cause) => new OAuthError({ message: "Failed to read token response", cause }),
       });
 
       return yield* new OAuthError({
-        message: `Problem encountered while trying to ${operation}: ${response.status}, ${details}`,
+        message: `Problem encountered while trying to ${operation}`,
+        cause: { status: response.status, details },
       });
     }
 
     return yield* Effect.tryPromise({
       try: () => response.json() as Promise<KeysToSnakeCase<TokenResponse>>,
-      catch: (cause) =>
-        new OAuthError({ message: `Failed to parse token response: ${errorMessage(cause)}` }),
+      catch: (cause) => new OAuthError({ message: "Failed to parse token response", cause }),
     });
   });
 
@@ -462,7 +461,8 @@ const tokenFromTokenResponse = (
     Effect.mapError(
       (cause) =>
         new OAuthError({
-          message: `Failed to parse token response into a Token schema: ${errorMessage(cause)}`,
+          message: "Failed to parse token response into a Token schema",
+          cause,
         }),
     ),
   );
