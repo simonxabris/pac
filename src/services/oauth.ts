@@ -6,7 +6,7 @@ import { AsyncEntry } from "@napi-rs/keyring";
 import { Polar } from "@polar-sh/sdk";
 import type { Organization } from "@polar-sh/sdk/models/components/organization.js";
 import type { TokenResponse } from "@polar-sh/sdk/models/components/tokenresponse.js";
-import { Console, Schema } from "effect";
+import { Schema } from "effect";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
