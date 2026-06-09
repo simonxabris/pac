@@ -27,7 +27,7 @@ const logoutCommand = Command.make("logout", {}, () =>
 
 const whoamiCommand = Command.make("whoami", { env: polarEnvFlag }, ({ env }) =>
   Effect.gen(function*() {
-    const server = env as PolarEnvironment;
+    const server = env;
     const oauth = yield* OAuth;
     const authenticated = yield* oauth.isAuthenticated(server);
 
