@@ -20,7 +20,7 @@
   },
   "scripts": {
     "dev": "node --import tsx src/cli.ts",
-    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "build": "tsgo -p tsconfig.json && chmod +x dist/cli.js",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -28,7 +28,8 @@
     "test:e2e": "pnpm build && vitest run -c vitest.e2e.config.ts",
     "lint": "oxlint -c .oxlintrc.ts",
     "format": "oxfmt -c .oxfmtrc.ts --write .",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "prepare": "pnpm build"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.76",
