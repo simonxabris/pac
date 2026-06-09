@@ -49,7 +49,26 @@ const whoamiCommand = Command.make("whoami", { env: polarEnvFlag }, ({ env }) =>
   }),
 ).pipe(Command.withDescription("Show the current Polar login and selected organization"));
 
+const orgCommand = Command.make("org", { env: polarEnvFlag }, ({ env }) =>
+  Effect.gen(function*() {
+    const server = env;
+    const oauth = yield* OAuth;
+    const authenticated = yield* oauth.isAuthenticated(server);
+
+    if (!authenticated) {
+      yield* Console.log(`Not logged in to Polar ${server}`);
+      return;
+    }
+
+    const organization = yield* oauth.selectOrganization(server);
+
+    yield* Console.log(
+      `Selected Polar ${server} organization: ${organization.name} (${organization.slug})`,
+    );
+  }),
+).pipe(Command.withDescription("Select the active Polar organization"));
+
 export const authCommand = Command.make("auth").pipe(
   Command.withDescription("Manage Polar authentication"),
-  Command.withSubcommands([loginCommand, logoutCommand, whoamiCommand]),
+  Command.withSubcommands([loginCommand, logoutCommand, whoamiCommand, orgCommand]),
 );
