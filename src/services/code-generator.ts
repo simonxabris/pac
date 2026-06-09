@@ -549,7 +549,7 @@ const generateConfig = (model: ImportModel): Effect.Effect<string, CodeGeneratio
       const imports = [...context.imports].sort();
 
       return [
-        `import { ${imports.join(", ")} } from "pac";`,
+        `import { ${imports.join(", ")} } from "@simonxabris/pac";`,
         "",
         ...declarations.flatMap((declaration) => [declaration, ""]),
       ].join("\n");
