@@ -37,7 +37,7 @@ export const deployConfig = async (configPath: string, env: NodeJS.ProcessEnv): 
 
       reject(
         new Error(
-          `paac deploy failed with code ${code ?? "null"} signal ${signal ?? "null"}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
+          `pac deploy failed with code ${code ?? "null"} signal ${signal ?? "null"}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
         ),
       );
     });

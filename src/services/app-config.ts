@@ -22,11 +22,11 @@ const config = {
   polarServerUrl: Config.schema(Schema.String, "POLAR_SERVER_URL").pipe(Config.option),
 };
 
-export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()("@paac/AppConfig") {
+export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()("@pac/AppConfig") {
   static readonly layerWithCliEnv = (cliEnv?: PolarEnvironment) =>
     Layer.effect(
       AppConfig,
-      Effect.gen(function*() {
+      Effect.gen(function* () {
         const values = yield* Config.all(config);
         return AppConfig.of({
           ...(Option.isSome(values.polarAccessToken)

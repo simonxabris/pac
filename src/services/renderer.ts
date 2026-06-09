@@ -61,7 +61,10 @@ const getPathValue = (value: unknown, path: ReadonlyArray<string | number>): unk
   return cursor;
 };
 
-const priceCurrencyForPath = (spec: unknown, path: ReadonlyArray<string | number>): string | undefined => {
+const priceCurrencyForPath = (
+  spec: unknown,
+  path: ReadonlyArray<string | number>,
+): string | undefined => {
   const [collection, index, field] = path;
   if (collection !== "prices" || typeof index !== "number" || !PRICE_AMOUNT_FIELDS.has(field)) {
     return undefined;
@@ -78,7 +81,8 @@ const renderPlanValue = (
   value: unknown,
   context?: { readonly spec: unknown; readonly path: ReadonlyArray<string | number> },
 ): string => {
-  const currency = context === undefined ? undefined : priceCurrencyForPath(context.spec, context.path);
+  const currency =
+    context === undefined ? undefined : priceCurrencyForPath(context.spec, context.path);
 
   if (currency !== undefined && isCurrencyAmountInput(value)) {
     try {
@@ -143,7 +147,10 @@ const renderIndentedValue = (label: string, value: unknown, spaces: number): str
 const renderField = (field: RenderedField, spec: unknown): string =>
   `      ${renderPath(field.path)}: ${renderPlanValue(field.value, { path: field.path, spec })}`;
 
-const renderFieldChange = (change: FieldChange, node: Extract<PlanNode, { readonly _tag: "Update" }>): string => {
+const renderFieldChange = (
+  change: FieldChange,
+  node: Extract<PlanNode, { readonly _tag: "Update" }>,
+): string => {
   const before = renderPlanValue(change.before, { path: change.path, spec: node.current.spec });
   const after = renderPlanValue(change.after, { path: change.path, spec: node.desired.spec });
   const path = renderPath(change.path);
@@ -159,14 +166,18 @@ const renderFieldChange = (change: FieldChange, node: Extract<PlanNode, { readon
   ].join("\n");
 };
 
-const renderCreateFields = (node: Extract<PlanNode, { readonly _tag: "Create" }>): ReadonlyArray<string> => {
+const renderCreateFields = (
+  node: Extract<PlanNode, { readonly _tag: "Create" }>,
+): ReadonlyArray<string> => {
   const fields: Array<RenderedField> = [{ path: ["key"], value: node.desired.key }];
   collectFields(node.desired.spec, [], fields);
 
   return ["    Fields:", ...fields.map((field) => renderField(field, node.desired.spec))];
 };
 
-const renderUpdateChanges = (node: Extract<PlanNode, { readonly _tag: "Update" }>): ReadonlyArray<string> => [
+const renderUpdateChanges = (
+  node: Extract<PlanNode, { readonly _tag: "Update" }>,
+): ReadonlyArray<string> => [
   "    Changes:",
   ...node.changes.map((change) => renderFieldChange(change, node)),
 ];
@@ -203,7 +214,7 @@ export class Renderer extends Context.Service<
     Renderer,
     Renderer.of({
       render: (plan) =>
-        Effect.gen(function*() {
+        Effect.gen(function* () {
           const nodes = [...plan.nodes.values()];
           const creates = nodes.filter((n) => n._tag === "Create");
           const updates = nodes.filter((n) => n._tag === "Update");
@@ -239,7 +250,9 @@ export class Renderer extends Context.Service<
 
           if (deletes.length > 0) {
             yield* Console.log(`\nDelete (${deletes.length}):`);
-            yield* Console.log("  WARNING: delete-mode removals are destructive and may revoke existing access or grants.");
+            yield* Console.log(
+              "  WARNING: delete-mode removals are destructive and may revoke existing access or grants.",
+            );
             for (const node of deletes) {
               yield* Console.log(renderNode(node));
             }

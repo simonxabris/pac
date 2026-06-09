@@ -15,7 +15,7 @@ export class UserConfigLoadError extends Schema.TaggedErrorClass<UserConfigLoadE
 ) {}
 
 const loadDesiredResources = (
-  configPath = "paac.config.ts",
+  configPath = "pac.config.ts",
 ): Effect.Effect<ReadonlyArray<DesiredResource>, UserConfigLoadError> =>
   Effect.tryPromise({
     try: async () => {
@@ -27,7 +27,7 @@ const loadDesiredResources = (
     catch: (cause) =>
       new UserConfigLoadError({
         path: configPath,
-        message: `Failed to load PAAC config: ${errorMessage(cause)}`,
+        message: `Failed to load PAC config: ${errorMessage(cause)}`,
       }),
   });
 

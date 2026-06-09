@@ -13,7 +13,10 @@ import {
   type ImportProjectionError,
 } from "../import/project.js";
 import { Planner } from "../services/planner.js";
-import { RemoteResourceFetcher, RemoteResourceFetchError } from "../services/remote-resource-fetcher.js";
+import {
+  RemoteResourceFetcher,
+  RemoteResourceFetchError,
+} from "../services/remote-resource-fetcher.js";
 import {
   dryRunFlag,
   forceFlag,
@@ -121,7 +124,7 @@ const printAdoptionPlan = (model: ImportModel): Effect.Effect<void> =>
     }
 
     yield* Console.log(
-      `Adoption plan: ${resources.length} resource(s) would receive PAAC Metadata:`,
+      `Adoption plan: ${resources.length} resource(s) would receive PAC Metadata:`,
     );
     for (const resource of resources) {
       yield* Console.log(`- ${resource.desired.address}`);
@@ -196,7 +199,7 @@ export class ImportCommand extends Context.Service<
           yield* fs.makeDirectory(destination.directory, { recursive: true });
           const stagedPath = pathService.join(
             destination.directory,
-            `.paac-import-${Date.now()}-${Math.random().toString(36).slice(2)}.config.ts`,
+            `.pac-import-${Date.now()}-${Math.random().toString(36).slice(2)}.config.ts`,
           );
           yield* fs.writeFileString(stagedPath, contents);
           yield* validateGeneratedConfig(stagedPath, model).pipe(
@@ -219,7 +222,7 @@ export class ImportCommand extends Context.Service<
           Effect.mapError((cause) =>
             validationError(
               filePath,
-              `Generated config is valid, but post-adoption validation failed. Import may have partially completed. Run \`paac plan --config ${filePath}\` to inspect the remaining changes.`,
+              `Generated config is valid, but post-adoption validation failed. Import may have partially completed. Run \`pac plan --config ${filePath}\` to inspect the remaining changes.`,
               cause,
             ),
           ),
@@ -284,4 +287,4 @@ export const importCommand = Command.make(
       const command = yield* ImportCommand;
       yield* command.run({ path, overwrite, dryRun, skipUnsupported, force });
     }),
-).pipe(Command.withDescription("Import existing Polar resources into PAAC"));
+).pipe(Command.withDescription("Import existing Polar resources into PAC"));

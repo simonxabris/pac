@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import { MeterResourceAdapter } from "./meter-adapter.js";
 import {
   and,
@@ -62,7 +62,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
             _tag: "CreateMeter",
             payload: {
               metadata: {
-                [PAAC_METADATA_KEY]: JSON.stringify({
+                [PAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "meter",
                   addr: "meter.requests",

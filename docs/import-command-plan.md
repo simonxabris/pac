@@ -2,48 +2,48 @@
 
 ## Goal
 
-Add a top-level `paac import` command that brings existing Polar resources under PAAC management.
+Add a top-level `pac import` command that brings existing Polar resources under PAC management.
 
-This command is for a Polar Organization that already has Products, Meters, and Benefits created outside PAAC. It should:
+This command is for a Polar Organization that already has Products, Meters, and Benefits created outside PAC. It should:
 
-1. fetch supported remote Polar resources, including resources that do not have PAAC Metadata yet;
-2. infer a `paac.config.ts`-style source file that declares equivalent PAAC resources;
+1. fetch supported remote Polar resources, including resources that do not have PAC Metadata yet;
+2. infer a `pac.config.ts`-style source file that declares equivalent PAC resources;
 3. assign Resource Addresses to unmanaged resources;
-4. write PAAC Metadata back to those remote resources so future `paac plan` / `paac deploy` reconcile the existing Polar resources instead of creating duplicates;
+4. write PAC Metadata back to those remote resources so future `pac plan` / `pac deploy` reconcile the existing Polar resources instead of creating duplicates;
 5. verify that the generated config is deploy-safe.
 
 `import` is distinct from the planned future `pull` command:
 
-- `paac pull` does not exist yet. When added, it should recreate config for already Managed Resources only and should not mutate Polar.
-- `paac import` adopts unmanaged Polar resources and therefore mutates Polar by default.
+- `pac pull` does not exist yet. When added, it should recreate config for already Managed Resources only and should not mutate Polar.
+- `pac import` adopts unmanaged Polar resources and therefore mutates Polar by default.
 
 ## Terminology
 
 Use the language from `CONTEXT.md`:
 
 - **Polar Organization**: the selected remote ownership boundary.
-- **Managed Resource**: a Polar resource with PAAC Metadata.
-- **PAAC Metadata**: the `metadata.paac` JSON string identifying PAAC ownership and Resource Address.
-- **Resource Address**: stable PAAC identity such as `product.pro`.
-- **Product Price**: part of a Product, not a standalone PAAC resource.
+- **Managed Resource**: a Polar resource with PAC Metadata.
+- **PAC Metadata**: the `metadata.pac` JSON string identifying PAC ownership and Resource Address.
+- **Resource Address**: stable PAC identity such as `product.pro`.
+- **Product Price**: part of a Product, not a standalone PAC resource.
 
-Avoid describing imported resources as being matched by Polar ID in user-facing messages. Polar IDs are provider state, while Resource Addresses are PAAC identity.
+Avoid describing imported resources as being matched by Polar ID in user-facing messages. Polar IDs are provider state, while Resource Addresses are PAC identity.
 
 ## CLI Shape
 
 Initial command:
 
 ```bash
-paac import --path paac.config.ts
+pac import --path pac.config.ts
 ```
 
 Recommended flags:
 
 ```bash
-paac import --path paac.config.ts --overwrite
-paac import --path paac.config.ts --dry-run
-paac import --path paac.config.ts --skip-unsupported
-paac import --path paac.config.ts --force
+pac import --path pac.config.ts --overwrite
+pac import --path pac.config.ts --dry-run
+pac import --path pac.config.ts --skip-unsupported
+pac import --path pac.config.ts --force
 ```
 
 ### Flags
@@ -55,7 +55,7 @@ Output path for the generated config file.
 Default:
 
 ```bash
-paac.config.ts
+pac.config.ts
 ```
 
 Unlike `generate`, this command should treat the path as a file path by default, because the output is specifically a config file.
@@ -74,7 +74,7 @@ Behavior:
 
 - print the full generated config to stdout;
 - print a concise resource summary;
-- list which resources would receive PAAC Metadata;
+- list which resources would receive PAC Metadata;
 - do not write the file;
 - do not mutate Polar.
 
@@ -93,28 +93,28 @@ When `--skip-unsupported` is used:
 - the CLI must print a warning listing every skipped resource and the reason it was skipped;
 - any otherwise-supported resource that depends on a skipped unsupported resource should either be skipped with its own warning or fail if skipping it would make adoption unsafe.
 
-Example: if a Product has an attached Benefit type PAAC cannot represent, importing the Product while omitting that Benefit would make PAAC's Product Benefit Attachment differ from Polar. In that case, the Product should be treated as not faithfully importable unless the implementation has a safe explicit strategy for preserving that attachment.
+Example: if a Product has an attached Benefit type PAC cannot represent, importing the Product while omitting that Benefit would make PAC's Product Benefit Attachment differ from Polar. In that case, the Product should be treated as not faithfully importable unless the implementation has a safe explicit strategy for preserving that attachment.
 
 #### `--force`
 
-Allow overwriting conflicting existing PAAC Metadata.
+Allow overwriting conflicting existing PAC Metadata.
 
 Default should refuse conflicts.
 
-A conflict means the remote resource already has `metadata.paac`, but it points to an address/key/kind that does not match the address the import process would assign.
+A conflict means the remote resource already has `metadata.pac`, but it points to an address/key/kind that does not match the address the import process would assign.
 
 ## High-Level Flow
 
 ```text
-paac import
+pac import
   -> fetch raw Polar inventory
   -> classify supported resources
   -> generate/preserve Resource Addresses
   -> resolve relationships
-  -> project remote resources to PAAC specs
-  -> render paac.config.ts
+  -> project remote resources to PAC specs
+  -> render pac.config.ts
   -> write file unless --dry-run
-  -> write PAAC Metadata unless --dry-run
+  -> write PAC Metadata unless --dry-run
   -> fetch managed resources through normal RemoteResourceFetcher
   -> load generated config
   -> run Planner
@@ -125,7 +125,7 @@ paac import
 
 ### 1. Fetch raw Polar inventory
 
-Do not add a separate inventory-fetching service. Extend the existing `RemoteResourceFetcher` service with a second method that fetches raw Polar inventory without filtering by PAAC Metadata.
+Do not add a separate inventory-fetching service. Extend the existing `RemoteResourceFetcher` service with a second method that fetches raw Polar inventory without filtering by PAC Metadata.
 
 Keep the existing `fetch()` method for current `plan`, `deploy`, and `generate` behavior. That method should continue returning only Managed Resources:
 
@@ -154,7 +154,7 @@ type PolarInventory = {
 };
 ```
 
-Implementation detail: factor the shared concurrent list calls into a private helper inside `src/remote-resource-fetcher.ts`, then have both `fetchInventory()` and `fetch()` call it. `fetch()` can continue applying PAAC Metadata filtering and decoding on top of that raw inventory.
+Implementation detail: factor the shared concurrent list calls into a private helper inside `src/remote-resource-fetcher.ts`, then have both `fetchInventory()` and `fetch()` call it. `fetch()` can continue applying PAC Metadata filtering and decoding on top of that raw inventory.
 
 ### 2. Filter / classify resources
 
@@ -204,7 +204,7 @@ ImportResourceClassification.match(classification, {
 });
 ```
 
-Already Managed Resources should preserve their Resource Address from PAAC Metadata.
+Already Managed Resources should preserve their Resource Address from PAC Metadata.
 
 Unmanaged resources need generated Resource Addresses.
 
@@ -302,9 +302,9 @@ If a relationship points to an unsupported, skipped, archived, deleted, or other
 
 With `--skip-unsupported`, skipping relationship targets is risky. Prefer still failing if a supported imported resource would produce an invalid config because of a missing dependency.
 
-### 6. Project remote resources into PAAC specs
+### 6. Project remote resources into PAC specs
 
-Do not reuse the full `decodeRemote*Resource` path for import. Import primarily needs to validate and normalize the remote resource **spec**, not construct a full `CurrentResource` from already-present PAAC Metadata.
+Do not reuse the full `decodeRemote*Resource` path for import. Import primarily needs to validate and normalize the remote resource **spec**, not construct a full `CurrentResource` from already-present PAC Metadata.
 
 The current code already contains the needed normalization logic inside `src/remote-resource-fetcher.ts`, but it is bundled into functions that produce full Managed Resource shapes:
 
@@ -312,7 +312,7 @@ The current code already contains the needed normalization logic inside `src/rem
 - `decodeRemoteBenefitResource`
 - `decodeRemoteProductResource`
 
-Refactor that logic into spec-level projection functions and let both `RemoteResourceFetcher` and `import` call those shared functions. This avoids in-memory PAAC Metadata injection and avoids forcing import to provide Managed Resource identity before decoding the remote shape.
+Refactor that logic into spec-level projection functions and let both `RemoteResourceFetcher` and `import` call those shared functions. This avoids in-memory PAC Metadata injection and avoids forcing import to provide Managed Resource identity before decoding the remote shape.
 
 Suggested shared API:
 
@@ -376,7 +376,7 @@ return {
 The shared spec projection should still reuse existing helper logic where possible:
 
 - price amount conversion helpers such as `polarIntegerMinorUnitAmount` / `polarDecimalMinorUnitAmount`;
-- relationship resolution from Polar IDs to PAAC Resource Addresses;
+- relationship resolution from Polar IDs to PAC Resource Addresses;
 - `MeterSpec`, `BenefitSpec`, and `ProductSpec` schemas for validation.
 
 Good candidate module names:
@@ -471,9 +471,9 @@ customPrice({ currency: "usd", minimumAmount: "10" });
 meteredUnitPrice({ meter: meterTokens, amount: "0.001", currency: "usd", capAmount: "100" });
 ```
 
-Product Prices are not standalone PAAC resources and should stay embedded in `new Product(...)` declarations.
+Product Prices are not standalone PAC resources and should stay embedded in `new Product(...)` declarations.
 
-### 7. Render `paac.config.ts`
+### 7. Render `pac.config.ts`
 
 Extend the existing `CodeGenerator` service instead of creating a separate rendering service.
 
@@ -499,7 +499,7 @@ Imports should include only used symbols.
 Example output:
 
 ```ts
-import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "paac";
+import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "pac";
 
 export const meterTokens = new Meter("tokens", {
   name: "Tokens",
@@ -552,15 +552,15 @@ Rules:
 - write only after projection and rendering succeed;
 - in `--dry-run`, do not write.
 
-### 9. Adopt resources by writing PAAC Metadata
+### 9. Adopt resources by writing PAC Metadata
 
-`paac import` should adopt by default, meaning it writes PAAC Metadata to unmanaged remote resources.
+`pac import` should adopt by default, meaning it writes PAC Metadata to unmanaged remote resources.
 
 Metadata shape should match existing `managedMetadata(...)`:
 
 ```ts
 {
-  paac: JSON.stringify({
+  pac: JSON.stringify({
     v: 1,
     kind,
     addr: address,
@@ -569,7 +569,7 @@ Metadata shape should match existing `managedMetadata(...)`:
 }
 ```
 
-Important: preserve existing non-PAAC metadata keys.
+Important: preserve existing non-PAC metadata keys.
 
 Adoption update requirements:
 
@@ -577,13 +577,13 @@ Adoption update requirements:
 - Meters: update metadata on the Meter.
 - Benefits: update metadata on the Benefit.
 
-The current adapters already create resources with PAAC Metadata. Import adoption can call the existing `PolarClient.updateProduct`, `PolarClient.updateMeter`, and `PolarClient.updateBenefit` methods directly with metadata-only update payloads. If the local operation payload types need metadata fields later, extend them separately; import does not need to go through the operation planner.
+The current adapters already create resources with PAC Metadata. Import adoption can call the existing `PolarClient.updateProduct`, `PolarClient.updateMeter`, and `PolarClient.updateBenefit` methods directly with metadata-only update payloads. If the local operation payload types need metadata fields later, extend them separately; import does not need to go through the operation planner.
 
 Safety rules:
 
-- If a resource has no PAAC Metadata, write generated metadata.
-- If a resource has matching PAAC Metadata, leave it unchanged.
-- If a resource has conflicting PAAC Metadata, fail unless `--force`.
+- If a resource has no PAC Metadata, write generated metadata.
+- If a resource has matching PAC Metadata, leave it unchanged.
+- If a resource has conflicting PAC Metadata, fail unless `--force`.
 - If `--dry-run`, do not write metadata.
 
 Confirmed against `docs/reference/polar-openapi.json`: `ProductUpdate`, `MeterUpdate`, `BenefitMeterCreditUpdate`, and `BenefitCustomUpdate` all include `metadata`. Because the SDK is generated from this spec, the SDK update types should expose metadata as well; still verify with TypeScript during implementation.
@@ -600,7 +600,7 @@ After writing the file and adopting metadata:
 If validation fails, print a diagnostic that import partially completed and tell the user to run:
 
 ```bash
-paac plan --config <path>
+pac plan --config <path>
 ```
 
 Potentially keep a record of adopted resources so a future rollback/import-repair command could be added, but do not implement rollback in the first version unless necessary.
@@ -688,16 +688,16 @@ Using fake `PolarClient`:
 
 Recommended first implementation:
 
-1. Add `paac import --path <file> --overwrite`.
+1. Add `pac import --path <file> --overwrite`.
 2. Fetch all active Products, Meters, and Benefits.
-3. Support current PAAC resource surface:
+3. Support current PAC resource surface:
    - Products
    - Meters
    - Benefits: `meter_credit` and `custom`
    - Product Prices: fixed, free, custom, metered unit
 4. Generate deterministic Resource Addresses and variable names.
-5. Render `paac.config.ts`.
-6. Adopt resources by writing PAAC Metadata.
+5. Render `pac.config.ts`.
+6. Adopt resources by writing PAC Metadata.
 7. Validate with existing `ConfigLoader`, `RemoteResourceFetcher`, and `Planner`.
 
 Defer:
@@ -712,11 +712,11 @@ Defer:
 
 ## Decisions Captured So Far
 
-1. `paac import` should include all active supported remote resources by default, whether already Managed Resources or currently unmanaged resources. It is aimed at producing a full config from the remote Polar Organization. Existing PAAC Metadata is preserved; unmanaged resources are adopted.
+1. `pac import` should include all active supported remote resources by default, whether already Managed Resources or currently unmanaged resources. It is aimed at producing a full config from the remote Polar Organization. Existing PAC Metadata is preserved; unmanaged resources are adopted.
 
 2. Console output should be minimal during normal execution because the real output is the generated config file. Print a concise summary, warnings, the output path, and validation status.
 
-3. Generated config should be explicit for the first implementation. Do not omit fields merely because PAAC public API defaults would fill them in. Minimal config can be revisited later.
+3. Generated config should be explicit for the first implementation. Do not omit fields merely because PAC public API defaults would fill them in. Minimal config can be revisited later.
 
 4. `--dry-run` should print the full generated config. Do not add a separate `--stdout` flag for the initial version.
 
@@ -724,7 +724,7 @@ Defer:
 
 6. Unsupported resources are handled as follows:
 
-   Clarification: “partial unsupported resources” means the Polar Organization contains a mixture of resources PAAC can represent and resources PAAC cannot represent yet. For example, PAAC may support Products, Meters, meter-credit Benefits, and custom Benefits, while the Polar Organization also contains a Discord Benefit or another Benefit type outside PAAC's current resource surface.
+   Clarification: “partial unsupported resources” means the Polar Organization contains a mixture of resources PAC can represent and resources PAC cannot represent yet. For example, PAC may support Products, Meters, meter-credit Benefits, and custom Benefits, while the Polar Organization also contains a Discord Benefit or another Benefit type outside PAC's current resource surface.
    - By default, any unsupported active remote resource fails the import because the generated config would not be a full representation of the Polar Organization.
    - With `--skip-unsupported`, unsupported resources are omitted from the generated config and the CLI prints warnings listing what was skipped and why.
    - If an otherwise-supported resource cannot be represented faithfully because it depends on a skipped unsupported resource, it must not be silently adopted into a config that would drift. Either skip that dependent resource with a warning or fail with a clear diagnostic.
@@ -733,11 +733,11 @@ Defer:
 
 ## Implementation Order
 
-Implement `paac import` in small reviewable slices. Each slice should compile independently and either include focused tests or expose behavior that can be checked with existing tests.
+Implement `pac import` in small reviewable slices. Each slice should compile independently and either include focused tests or expose behavior that can be checked with existing tests.
 
 ### 1. Add raw inventory method to `RemoteResourceFetcher`
 
-Goal: fetch all relevant Polar resources without filtering by PAAC Metadata, while reusing the existing remote fetching service.
+Goal: fetch all relevant Polar resources without filtering by PAC Metadata, while reusing the existing remote fetching service.
 
 Scope:
 
@@ -755,7 +755,7 @@ type PolarInventory = {
 
 Tests / review:
 
-- Unit test with a fake `PolarClient` proving `fetchInventory()` uses all three list calls and does no PAAC Metadata filtering.
+- Unit test with a fake `PolarClient` proving `fetchInventory()` uses all three list calls and does no PAC Metadata filtering.
 - Existing tests for `fetch()` / planner behavior should keep passing, proving managed fetching behavior did not change.
 
 ### 2. Add import classification and identity assignment
@@ -768,7 +768,7 @@ Scope:
 - Preserve identity for already Managed Resources.
 - Generate keys and Resource Addresses for unmanaged resources.
 - Skip archived/deleted resources for the MVP.
-- Detect conflicting PAAC Metadata.
+- Detect conflicting PAC Metadata.
 - Generate kind-prefixed variable names such as `meterTokens`, `benefitIncludedTokens`, `productPro`.
 
 Tests / review:
@@ -816,7 +816,7 @@ Scope:
   - `meter_credit`
   - `custom`
 - Build Meter ID -> Meter address / variable name lookup from the Meter import model.
-- Resolve meter-credit Benefit `meterId` to a PAAC Meter Resource Address.
+- Resolve meter-credit Benefit `meterId` to a PAC Meter Resource Address.
 - Reuse existing Benefit normalization logic from `RemoteResourceFetcher`; refactor only the Benefit spec projection code needed for this slice.
 
 Tests / review:
@@ -835,8 +835,8 @@ Scope:
 - Build lookup tables:
   - Meter ID -> Meter address / variable name
   - Benefit ID -> Benefit address / variable name
-- Resolve metered Product Price `meterId` to a PAAC Meter Resource Address.
-- Resolve Product Benefit attachments to PAAC Benefit Resource Addresses.
+- Resolve metered Product Price `meterId` to a PAC Meter Resource Address.
+- Resolve Product Benefit attachments to PAC Benefit Resource Addresses.
 - Reuse existing Product normalization logic from `RemoteResourceFetcher`; refactor only the Product spec projection code needed for this slice.
 
 Tests / review:
@@ -873,7 +873,7 @@ Goal: safely write generated config files.
 Scope:
 
 - Add config output path resolution for `import`.
-- Default to `paac.config.ts`.
+- Default to `pac.config.ts`.
 - Treat `--path` as a file path.
 - Refuse overwrite unless `--overwrite`.
 - Create parent directories.
@@ -884,14 +884,14 @@ Tests / review:
 
 ### 8. Add adoption metadata writer
 
-Goal: write PAAC Metadata to remote resources that need adoption.
+Goal: write PAC Metadata to remote resources that need adoption.
 
 Scope:
 
 - Add `ResourceAdopter`.
-- Preserve existing non-PAAC metadata.
+- Preserve existing non-PAC metadata.
 - Leave already Managed Resources unchanged when metadata matches.
-- Refuse conflicting PAAC Metadata unless `--force`.
+- Refuse conflicting PAC Metadata unless `--force`.
 - Use metadata-only update calls through `PolarClient.updateProduct`, `updateMeter`, and `updateBenefit`.
 
 Tests / review:
@@ -910,14 +910,14 @@ Scope:
 - Fetch Managed Resources through `RemoteResourceFetcher`.
 - Run `Planner.plan`.
 - Assert the plan is up to date.
-- On failure, print actionable instructions to run `paac plan --config <path>`.
+- On failure, print actionable instructions to run `pac plan --config <path>`.
 
 Tests / review:
 
 - Fake managed fetch + config load path where validation passes.
 - One failure test verifying the diagnostic message.
 
-### 10. Wire the `paac import` CLI command
+### 10. Wire the `pac import` CLI command
 
 Goal: expose the complete command after internals are independently reviewed.
 
@@ -981,12 +981,12 @@ Scope:
 - Run:
 
 ```bash
-paac import --path paac.config.ts --overwrite
-paac plan --config paac.config.ts
+pac import --path pac.config.ts --overwrite
+pac plan --config pac.config.ts
 ```
 
 Expected result:
 
 - import writes config and metadata;
-- `paac plan` is clean;
+- `pac plan` is clean;
 - generated config is readable enough to become the user's source of truth.

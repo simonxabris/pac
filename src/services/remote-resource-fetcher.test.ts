@@ -51,7 +51,7 @@ const fakePolarClientLayer = ({
   );
 
 describe("RemoteResourceFetcher.fetchInventory", () => {
-  it.effect("fetches raw inventory without PAAC Metadata filtering", () => {
+  it.effect("fetches raw inventory without PAC Metadata filtering", () => {
     const calls: Array<string> = [];
     const unmanagedMeter = { id: "met_unmanaged", metadata: {} } as unknown as RemoteMeter;
     const managedMeter = {

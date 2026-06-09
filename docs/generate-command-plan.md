@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add a new CLI command, `generate`, that writes a runtime file such as `pac.runtime.ts` containing the current Polar IDs and useful metadata for PAAC-managed resources declared in the user's config.
+Add a new CLI command, `generate`, that writes a runtime file such as `pac.runtime.ts` containing the current Polar IDs and useful metadata for PAC-managed resources declared in the user's config.
 
 Example desired output for products:
 
@@ -25,19 +25,19 @@ The command should reuse the existing `RemoteResourceFetcher.fetch()` infrastruc
 
 - calls Polar through `PolarClient`
 - lists Products, Meters, and Benefits
-- filters to PAAC-managed resources via `metadata.paac`
-- decodes Polar SDK objects into PAAC `CurrentResource` shapes
+- filters to PAC-managed resources via `metadata.pac`
+- decodes Polar SDK objects into PAC `CurrentResource` shapes
 - resolves relationships between resources
 - preserves useful provider state such as Product Price IDs and attached Benefit IDs
 
-This avoids duplicating Polar SDK calls and PAAC metadata decoding logic.
+This avoids duplicating Polar SDK calls and PAC metadata decoding logic.
 
 ## Recommended Flow
 
 The `generate` command should:
 
 1. Load desired resources from the user config using the existing config loader.
-2. Fetch current PAAC-managed Polar resources with `RemoteResourceFetcher.fetch()`.
+2. Fetch current PAC-managed Polar resources with `RemoteResourceFetcher.fetch()`.
 3. Match desired resources by `ResourceAddress` against the fetched current resources.
 4. Fail if a desired resource is missing or removed in Polar.
 5. Project current resources into a runtime snapshot model.
@@ -46,17 +46,17 @@ The `generate` command should:
 Pseudo-flow:
 
 ```ts
-const desiredResources = yield* loadDesiredResources(config);
-const remoteResourceFetcher = yield* RemoteResourceFetcher;
+const desiredResources = yield * loadDesiredResources(config);
+const remoteResourceFetcher = yield * RemoteResourceFetcher;
 
-const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
+const currentResourcesByAddress = yield * remoteResourceFetcher.fetch();
 
 const runtimeResources = desiredResources.map((desired) => {
   const current = currentResourcesByAddress.get(desired.address);
 
   if (current === undefined || current.isRemoved) {
     throw new Error(
-      `Resource ${desired.address} does not exist in Polar yet. Run paac deploy first.`,
+      `Resource ${desired.address} does not exist in Polar yet. Run pac deploy first.`,
     );
   }
 
@@ -70,7 +70,7 @@ const file = renderRuntimeFile(runtimeResources);
 
 The desired config should define which resources appear in the generated runtime file.
 
-If generation used only `RemoteResourceFetcher.fetch()`, it could include stale PAAC-managed resources that are still present in Polar but no longer declared in the user's config, such as archived Products or old Meters.
+If generation used only `RemoteResourceFetcher.fetch()`, it could include stale PAC-managed resources that are still present in Polar but no longer declared in the user's config, such as archived Products or old Meters.
 
 Therefore:
 
@@ -82,10 +82,12 @@ Therefore:
 The command should use `Planner` to verify that the user's config is fully in sync with Polar before generating the runtime file.
 
 ```ts
-const plan = yield* planner.plan({
-  desiredResources,
-  currentResources: [...currentResourcesByAddress.values()],
-});
+const plan =
+  yield *
+  planner.plan({
+    desiredResources,
+    currentResources: [...currentResourcesByAddress.values()],
+  });
 ```
 
 For `generate`, the plan should effectively contain only `Noop` nodes for the desired resources being generated. This means the resources declared in code already exist in Polar and their managed fields are up to date.
@@ -103,7 +105,7 @@ Recommended behavior:
 1. fetch current resources
 2. run the planner
 3. if the plan contains anything other than acceptable `Noop` state, render the plan or a concise diagnostic summary
-4. tell the user to run `paac plan` or `paac deploy`
+4. tell the user to run `pac plan` or `pac deploy`
 5. abort execution before calling `CodeGenerator.generate(...)`
 
 Runtime data should still be projected from `currentResourcesByAddress`, not from the plan. The planner is used as a safety gate to ensure generated IDs and API objects correspond to the currently deployed config.
@@ -132,7 +134,7 @@ export const products = {
 } as const;
 ```
 
-The value should be the raw resource object returned by the Polar API, not a reduced PAAC projection. The current infrastructure already preserves this value on `CurrentResource.raw` when resources are decoded by `RemoteResourceFetcher.fetch()`.
+The value should be the raw resource object returned by the Polar API, not a reduced PAC projection. The current infrastructure already preserves this value on `CurrentResource.raw` when resources are decoded by `RemoteResourceFetcher.fetch()`.
 
 The same shape applies to all resource kinds:
 
@@ -216,7 +218,7 @@ export const benefits = {
 
 ## Domain Note: Product Prices
 
-Product Prices are not standalone PAAC resources. `CONTEXT.md` defines them as part of a Product.
+Product Prices are not standalone PAC resources. `CONTEXT.md` defines them as part of a Product.
 
 Therefore, price data should remain nested inside the raw Polar Product object rather than generated as a top-level `prices` export.
 
@@ -230,9 +232,7 @@ The generation logic should be encapsulated in a dedicated Effect service named 
 
 ```ts
 type CodeGeneratorShape = {
-  readonly generate: (
-    currentResources: ReadonlyArray<CurrentResource>,
-  ) => Effect.Effect<string>;
+  readonly generate: (currentResources: ReadonlyArray<CurrentResource>) => Effect.Effect<string>;
 };
 ```
 
@@ -255,8 +255,8 @@ The `generate` command should accept a `--path` flag that controls where the run
 Examples:
 
 ```sh
-paac generate --path src/billing
-paac generate --path src/billing/polar.data.ts
+pac generate --path src/billing
+pac generate --path src/billing/polar.data.ts
 ```
 
 The flag should support two forms:
@@ -316,7 +316,7 @@ Recommended destination resolution helper:
 const defaultRuntimeFileName = "pac.runtime.ts";
 
 const resolveGenerateOutputPath = (inputPath: string) =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
 
@@ -364,8 +364,8 @@ const resolveGenerateOutputPath = (inputPath: string) =>
 After resolving the destination:
 
 ```ts
-yield* fs.makeDirectory(destination.directory, { recursive: true });
-yield* fs.writeFileString(destination.filePath, generatedContents);
+yield * fs.makeDirectory(destination.directory, { recursive: true });
+yield * fs.writeFileString(destination.filePath, generatedContents);
 ```
 
 This allows both of these to work:
@@ -406,4 +406,4 @@ project CurrentResource -> runtime export model
 render pac.runtime.ts
 ```
 
-This reuses the existing Polar-fetching, PAAC metadata parsing, resource decoding, relationship resolution, and provider state extraction infrastructure already present in the codebase.
+This reuses the existing Polar-fetching, PAC metadata parsing, resource decoding, relationship resolution, and provider state extraction infrastructure already present in the codebase.

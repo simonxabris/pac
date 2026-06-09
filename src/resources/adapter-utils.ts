@@ -1,6 +1,6 @@
 import { Equal } from "effect";
 import type { ResourceKind } from "../core/kind.js";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import type { RollbackAction } from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
 import type { FieldChange } from "../services/planner.js";
@@ -49,7 +49,7 @@ export const managedMetadata = (
   address: OperationRef["address"],
   key: string,
 ) => ({
-  [PAAC_METADATA_KEY]: JSON.stringify({
+  [PAC_METADATA_KEY]: JSON.stringify({
     v: 1,
     kind,
     addr: address,

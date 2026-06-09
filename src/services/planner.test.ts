@@ -2,7 +2,10 @@ import { describe, expect, it, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { Planner } from "./planner.js";
 import { ResourceAdapterRegistryLive } from "./resource-adapters.js";
-import { eraseResourceAdapter, makeResourceAdapterRegistryLayer } from "./resource-adapter-registry.js";
+import {
+  eraseResourceAdapter,
+  makeResourceAdapterRegistryLayer,
+} from "./resource-adapter-registry.js";
 import { count, Meter, type CurrentMeterResource } from "../resources/meter.js";
 import { MeterResourceAdapter } from "../resources/meter-adapter.js";
 import {
@@ -34,7 +37,7 @@ describe("Planner.plan", () => {
   });
 
   it.effect("plans create nodes and dependency edges for a new metered product", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meter = new Meter("requests", {
         name: "Requests",
         filter: { conjunction: "and", clauses: [] },
@@ -83,7 +86,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("plans an update node when desired and current specs differ", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "2000", currency: "usd" })],
@@ -128,7 +131,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("blocks an existing product when recurringInterval changes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "2000", currency: "usd" })],
@@ -178,7 +181,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("blocks an existing product when recurringIntervalCount changes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "2000", currency: "usd" })],
@@ -227,7 +230,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("plans a noop node when desired and current specs match", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = new Meter("requests", {
         name: "Requests",
         filter: { conjunction: "and", clauses: [] },
@@ -266,7 +269,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("blocks a desired resource when its desired dependency is missing", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const product = new Product("pro", {
         name: "Pro",
         prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.01", currency: "usd" })],
@@ -303,7 +306,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("blocks a desired resource when its dependency only exists in current resources", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meter = new Meter("requests", {
         name: "Requests",
         filter: { conjunction: "and", clauses: [] },
@@ -364,7 +367,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("blocks resources involved in dependency cycles", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meter = new Meter("requests", {
         name: "Requests",
         filter: { conjunction: "and", clauses: [] },
@@ -426,7 +429,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("does not return dangling edges for current dependencies missing from the plan", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const product = new Product("pro", {
         name: "Pro",
         prices: [meteredUnitPrice({ meter: "meter.requests", amount: "0.01", currency: "usd" })],
@@ -461,14 +464,15 @@ describe("Planner.plan", () => {
           severity: "warning",
           code: "dependency.currentTargetMissing",
           address: "product.pro",
-          message: "Current resource product.pro depends on missing current resource meter.requests.",
+          message:
+            "Current resource product.pro depends on missing current resource meter.requests.",
         },
       ]);
     }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("plans a remove node for a managed current resource absent from desired", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desiredShape = new Product("legacy", {
         name: "Legacy",
         prices: [fixedPrice({ amount: "1000", currency: "usd" })],
@@ -501,7 +505,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("ignores removed current resources absent from desired", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const product = new Product("pro", {
         name: "Pro",
         prices: [fixedPrice({ amount: "20", currency: "usd" })],
@@ -545,7 +549,7 @@ describe("Planner.plan", () => {
   );
 
   it.effect("captures dependencies from current resources for remove ordering", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meter = new Meter("requests", {
         name: "Requests",
         filter: { conjunction: "and", clauses: [] },

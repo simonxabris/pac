@@ -343,7 +343,7 @@ export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> =
     Effect.succeed([
       ...new Set([
         ...desired.spec.prices.flatMap((price) =>
-          price.type === "meteredUnit" ? [price.meter] : []
+          price.type === "meteredUnit" ? [price.meter] : [],
         ),
         ...desired.spec.benefits,
       ]),

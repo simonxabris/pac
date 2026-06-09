@@ -4,17 +4,17 @@ import type { OperationAction } from "./actions.js";
 
 export type RollbackAction =
   | {
-    readonly _tag: "RollbackOperation";
-    readonly action: OperationAction;
-  }
+      readonly _tag: "RollbackOperation";
+      readonly action: OperationAction;
+    }
   | {
-    readonly _tag: "NoopRollback";
-    readonly reason: string;
-  }
+      readonly _tag: "NoopRollback";
+      readonly reason: string;
+    }
   | {
-    readonly _tag: "UnsupportedRollback";
-    readonly reason: string;
-  };
+      readonly _tag: "UnsupportedRollback";
+      readonly reason: string;
+    };
 
 export type Operation = {
   readonly _tag: "Operation";

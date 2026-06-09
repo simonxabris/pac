@@ -5,7 +5,7 @@ import { Effect, Layer, Option, Schema } from "effect";
 import * as Context from "effect/Context";
 import { PolarClient, type PolarClientError } from "./polar-client.js";
 import { managedMetadata } from "../resources/adapter-utils.js";
-import { errorMessage, hasPaacMetadata } from "../utils.js";
+import { errorMessage, hasPacMetadata } from "../utils.js";
 import type { ImportModel } from "../import/project.js";
 
 export type ImportAdoptionSummary = {
@@ -110,12 +110,12 @@ export class ResourceAdopter extends Context.Service<
                 continue;
               }
 
-              if (hasPaacMetadata(resource.raw) && !options.force) {
+              if (hasPacMetadata(resource.raw) && !options.force) {
                 return yield* new ImportAdoptionError({
                   kind: resource.desired.kind,
                   polarId: resource.polarId,
                   message:
-                    "Remote resource already has conflicting PAAC Metadata. Re-run with --force to overwrite it.",
+                    "Remote resource already has conflicting PAC Metadata. Re-run with --force to overwrite it.",
                 });
               }
 

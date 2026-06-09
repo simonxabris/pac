@@ -2,7 +2,7 @@
 
 ## Scope
 
-Add Benefits as standalone PAAC resources, initially supporting only Polar's
+Add Benefits as standalone PAC resources, initially supporting only Polar's
 `meter_credit` type. The design must allow additional Polar Benefit types to be
 added without changing the generic resource, planning, or execution model.
 
@@ -24,15 +24,7 @@ Sources:
 ## Proposed Public API
 
 ```ts
-import {
-  Benefit,
-  Meter,
-  Product,
-  and,
-  count,
-  eventName,
-  fixedPrice,
-} from "paac";
+import { Benefit, Meter, Product, and, count, eventName, fixedPrice } from "pac";
 
 export const requests = new Meter("requests", {
   name: "API requests",
@@ -90,8 +82,7 @@ type MeterCreditBenefitConfig = {
   readonly rollover?: boolean;
 };
 
-type BenefitConfig =
-  | MeterCreditBenefitConfig;
+type BenefitConfig = MeterCreditBenefitConfig;
 
 type ProductConfig = {
   // existing fields
@@ -103,7 +94,7 @@ The single `Benefit` class is intentional. Benefit types are a discriminated
 configuration union, matching Polar's API model. Future types add a config/spec
 variant and adapter branches, not a new resource kind or lifecycle.
 
-Public names use PAAC's kebab-case convention (`meter-credit`); the adapter maps
+Public names use PAC's kebab-case convention (`meter-credit`); the adapter maps
 this to Polar's `meter_credit`.
 
 Defaults and validation:
@@ -129,8 +120,7 @@ type BenefitMeterCreditSpec = {
   readonly rollover: boolean;
 };
 
-type BenefitSpec =
-  | BenefitMeterCreditSpec;
+type BenefitSpec = BenefitMeterCreditSpec;
 ```
 
 Keep the canonical spec as a discriminated union rather than mirroring Polar's
@@ -157,7 +147,7 @@ This is preferable to merge semantics because:
 - drift is visible and repairable;
 - shared Benefits remain standalone resources.
 
-If a managed Product has an attached Benefit without valid PAAC metadata, block
+If a managed Product has an attached Benefit without valid PAC metadata, block
 the Product with a `product.benefits.unmanaged` diagnostic. Do not silently
 detach an unmanaged Benefit or hide it from the plan.
 
@@ -199,8 +189,8 @@ flag.
 The renderer must show separate `Archive` and `Delete` sections. Benefit
 deletion should also emit a warning that existing grants will be revoked.
 
-Recommended safety rule: `paac deploy` refuses plans containing delete-mode
-removals unless passed `--allow-delete`. `paac plan` always renders them.
+Recommended safety rule: `pac deploy` refuses plans containing delete-mode
+removals unless passed `--allow-delete`. `pac plan` always renders them.
 
 This generic removal change should receive an ADR because it changes a central
 planning concept and preserves the distinction between archival and destructive
@@ -250,7 +240,7 @@ Add a remote Benefit schema for the supported `meter_credit` shape:
 - `properties.rollover`
 - `properties.meterId`
 
-Only resources carrying valid PAAC metadata enter the managed resource map.
+Only resources carrying valid PAC metadata enter the managed resource map.
 
 Failure cases:
 
@@ -292,7 +282,7 @@ Create payload:
 {
   type: "meter_credit",
   description,
-  metadata: { paac: "..." },
+  metadata: { pac: "..." },
   properties: {
     meterId: Ref("meter.requests", "polarId"),
     units,
@@ -420,7 +410,7 @@ Documentation:
 - Update `CONTEXT.md` with Benefit terminology.
 - Add an ADR for generic Remove semantics.
 - Update operation/executor design docs from Archive-only terminology.
-- Extend `paac.config.ts` with the public API example.
+- Extend `pac.config.ts` with the public API example.
 
 ## Test Plan
 
@@ -522,7 +512,7 @@ land with tests at the resource, adapter, or service boundary it changes.
      listing and decode order `Meter -> Benefit -> Product`.
    - Tests: service/fetcher-level tests for meter-credit decode, deleted Benefit
      skip behavior, unknown Meter diagnostics/errors, unsupported Benefit type,
-     and malformed PAAC metadata.
+     and malformed PAC metadata.
 
 6. [x] Add Product Benefit attachment modeling and adapter operations.
    - Deliverable: Products can declare an authoritative Benefit attachment set,
@@ -547,6 +537,6 @@ land with tests at the resource, adapter, or service boundary it changes.
 8. [ ] Update user-facing docs and examples.
    - Deliverable: the public API example and project context describe Benefits,
      removal modes, and deletion safety in current terminology.
-   - Scope: `CONTEXT.md`, `paac.config.ts` examples, operation/executor design
+   - Scope: `CONTEXT.md`, `pac.config.ts` examples, operation/executor design
      docs, and any ADR follow-ups discovered during implementation.
    - Tests: documentation review plus existing typecheck/test suite.

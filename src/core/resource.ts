@@ -15,11 +15,10 @@ export type ResourceEnvelope<
   readonly spec: Spec;
 };
 
-export type DesiredResource<Kind extends ResourceKind = ResourceKind, Spec = unknown> = ResourceEnvelope<
-  "desired",
-  Kind,
-  Spec
->;
+export type DesiredResource<
+  Kind extends ResourceKind = ResourceKind,
+  Spec = unknown,
+> = ResourceEnvelope<"desired", Kind, Spec>;
 
 export type CurrentResource<
   Kind extends ResourceKind = ResourceKind,

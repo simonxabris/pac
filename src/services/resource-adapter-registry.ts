@@ -13,24 +13,30 @@ import type {
   UpdatePlanNode,
 } from "./planner.js";
 
-export type ResourceCreatePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
-  CreatePlanNode & {
-    readonly kind: Kind;
-    readonly desired: DesiredResource<Kind, Spec>;
-  };
+export type ResourceCreatePlanNode<
+  Kind extends ResourceKind = ResourceKind,
+  Spec = unknown,
+> = CreatePlanNode & {
+  readonly kind: Kind;
+  readonly desired: DesiredResource<Kind, Spec>;
+};
 
-export type ResourceUpdatePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
-  UpdatePlanNode & {
-    readonly kind: Kind;
-    readonly desired: DesiredResource<Kind, Spec>;
-    readonly current: CurrentResource<Kind, Spec>;
-  };
+export type ResourceUpdatePlanNode<
+  Kind extends ResourceKind = ResourceKind,
+  Spec = unknown,
+> = UpdatePlanNode & {
+  readonly kind: Kind;
+  readonly desired: DesiredResource<Kind, Spec>;
+  readonly current: CurrentResource<Kind, Spec>;
+};
 
-export type ResourceRemovePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
-  RemovePlanNode & {
-    readonly kind: Kind;
-    readonly current: CurrentResource<Kind, Spec>;
-  };
+export type ResourceRemovePlanNode<
+  Kind extends ResourceKind = ResourceKind,
+  Spec = unknown,
+> = RemovePlanNode & {
+  readonly kind: Kind;
+  readonly current: CurrentResource<Kind, Spec>;
+};
 
 export type ResourceExecutablePlanNode<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
   | ResourceCreatePlanNode<Kind, Spec>
@@ -129,12 +135,10 @@ export class ResourceAdapterRegistry extends Context.Service<
   ResourceAdapterRegistryShape
 >()("@app/ResourceAdapterRegistry") {}
 
-export const makeResourceAdapterRegistryLayer = (
-  adapters: ReadonlyArray<AnyResourceAdapter>,
-) =>
+export const makeResourceAdapterRegistryLayer = (adapters: ReadonlyArray<AnyResourceAdapter>) =>
   Layer.effect(
     ResourceAdapterRegistry,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const adaptersByKind = new Map<ResourceKind, AnyResourceAdapter>();
 
       for (const adapter of adapters) {

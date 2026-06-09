@@ -10,7 +10,7 @@ export type Resource<Kind extends ResourceKind = ResourceKind, Spec = unknown> =
   readonly toDesiredResource: () => DesiredResource<Kind, Spec>;
 };
 
-const registryKey = Symbol.for("paac.resources");
+const registryKey = Symbol.for("pac.resources");
 
 type GlobalWithRegistry = typeof globalThis & { [registryKey]?: Array<Resource> };
 

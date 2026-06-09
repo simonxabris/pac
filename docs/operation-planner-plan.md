@@ -167,9 +167,15 @@ This ordering belongs in `OperationPlanner`, not `Planner`.
 A simpler operation shape would mirror plan nodes:
 
 ```ts
-{ _tag: "Create", desired }
-{ _tag: "Update", desired, current, changes }
-{ _tag: "Archive", current }
+{
+  _tag: ("Create", desired);
+}
+{
+  _tag: ("Update", desired, current, changes);
+}
+{
+  _tag: ("Archive", current);
+}
 ```
 
 Drawbacks:
@@ -368,9 +374,9 @@ Warnings should not block operation creation.
 Only these plan nodes become operation groups:
 
 ```ts
-Create
-Update
-Archive
+Create;
+Update;
+Archive;
 ```
 
 `Noop` nodes are rendered for humans but do not produce executable operations.

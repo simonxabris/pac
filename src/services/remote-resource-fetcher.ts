@@ -9,7 +9,7 @@ import {
   polarIntegerMinorUnitNumber,
 } from "../currency/currency.js";
 import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "../core/address.js";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import type { CurrentResource } from "../core/resource.js";
 import type { RemoteBenefit, RemoteMeter, RemoteProduct } from "../types/polar-sdk-types.js";
 import { PolarClient } from "./polar-client.js";
@@ -38,7 +38,7 @@ import {
   type ProductPriceSpec,
   type ProductSpec,
 } from "../resources/product.js";
-import { errorMessage, hasPaacMetadata } from "../utils.js";
+import { errorMessage, hasPacMetadata } from "../utils.js";
 
 export type RemoteResourceMap = ReadonlyMap<ResourceAddress, CurrentResource>;
 
@@ -206,14 +206,14 @@ const schemaIssue = (actual: unknown, message: string): SchemaIssue.Issue =>
   new SchemaIssue.InvalidValue(Option.some(actual), { message });
 
 export const parseManagedIdentity = (metadata: typeof MetadataRecord.Type): ManagedIdentity => {
-  const value = metadata[PAAC_METADATA_KEY];
+  const value = metadata[PAC_METADATA_KEY];
   if (typeof value !== "string") {
-    throw new Error("Remote resource does not contain PAAC metadata.");
+    throw new Error("Remote resource does not contain PAC metadata.");
   }
 
   const envelope = Schema.decodeUnknownSync(ManagedIdentityEnvelope)(JSON.parse(value) as unknown);
   if (envelope.addr !== `${envelope.kind}.${envelope.key}`) {
-    throw new Error("PAAC metadata addr must equal `${kind}.${key}`.");
+    throw new Error("PAC metadata addr must equal `${kind}.${key}`.");
   }
 
   return {
@@ -230,13 +230,13 @@ export const identityForKind = (
 ): ManagedIdentity => {
   const identity = parseManagedIdentity(metadata);
   if (identity.kind !== kind) {
-    throw new Error(`Expected PAAC metadata kind '${kind}', got '${identity.kind}'.`);
+    throw new Error(`Expected PAC metadata kind '${kind}', got '${identity.kind}'.`);
   }
   return identity;
 };
 
-const stripPaacMetadata = (metadata: typeof MetadataRecord.Type) => {
-  const { [PAAC_METADATA_KEY]: _paac, ...userMetadata } = metadata;
+const stripPacMetadata = (metadata: typeof MetadataRecord.Type) => {
+  const { [PAC_METADATA_KEY]: _pac, ...userMetadata } = metadata;
   return normalizeBenefitMetadata(userMetadata as Record<string, string | number | boolean>);
 };
 
@@ -433,7 +433,7 @@ export const remoteBenefitToSpec = ({
       return Schema.decodeUnknownSync(BenefitSpecSchema)({
         type: "feature-flag",
         description: benefit.description,
-        metadata: stripPaacMetadata(benefit.metadata),
+        metadata: stripPacMetadata(benefit.metadata),
       });
   }
 };
@@ -641,7 +641,7 @@ export class RemoteResourceFetcher extends Context.Service<
             const remoteBenefits = inventory.benefits;
 
             const meters = yield* Effect.forEach(
-              remoteMeters.filter(hasPaacMetadata),
+              remoteMeters.filter(hasPacMetadata),
               (meter) =>
                 decodeRemoteMeterResource(meter).pipe(
                   Effect.mapError(
@@ -659,7 +659,7 @@ export class RemoteResourceFetcher extends Context.Service<
             ) as Record<string, MeterAddress>;
 
             const benefits = yield* Effect.forEach(
-              remoteBenefits.filter(hasPaacMetadata),
+              remoteBenefits.filter(hasPacMetadata),
               (benefit) =>
                 decodeRemoteBenefitResource({ benefit, meterAddressesById }).pipe(
                   Effect.mapError(
@@ -677,7 +677,7 @@ export class RemoteResourceFetcher extends Context.Service<
             ) as Record<string, BenefitAddress>;
 
             const products = yield* Effect.forEach(
-              remoteProducts.filter(hasPaacMetadata),
+              remoteProducts.filter(hasPacMetadata),
               (product) =>
                 decodeRemoteProductResource({
                   product,

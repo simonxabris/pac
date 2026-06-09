@@ -7,7 +7,7 @@ type RemoteWithMetadata = {
   readonly metadata?: Readonly<Record<string, unknown>>;
 };
 
-export const paacMetadata = (kind: "product" | "meter", key: string): string =>
+export const pacMetadata = (kind: "product" | "meter", key: string): string =>
   JSON.stringify({
     v: 1,
     kind,
@@ -15,11 +15,11 @@ export const paacMetadata = (kind: "product" | "meter", key: string): string =>
     key,
   });
 
-const hasPaacAddress = (
+const hasPacAddress = (
   resource: RemoteWithMetadata,
   kind: "product" | "meter",
   key: string,
-): boolean => resource.metadata?.paac === paacMetadata(kind, key);
+): boolean => resource.metadata?.pac === pacMetadata(kind, key);
 
 export const polarSdk = (org: PolarE2EOrganization): Polar =>
   new Polar({
@@ -59,7 +59,7 @@ export const findProductsByKey = async (
   key: string,
 ): Promise<Array<RemoteProduct>> => {
   const products = await listProducts(org);
-  return products.filter((product) => hasPaacAddress(product, "product", key));
+  return products.filter((product) => hasPacAddress(product, "product", key));
 };
 
 export const findMetersByKey = async (
@@ -67,7 +67,7 @@ export const findMetersByKey = async (
   key: string,
 ): Promise<Array<RemoteMeter>> => {
   const meters = await listMeters(org);
-  return meters.filter((meter) => hasPaacAddress(meter, "meter", key));
+  return meters.filter((meter) => hasPacAddress(meter, "meter", key));
 };
 
 export const findProductByKey = async (

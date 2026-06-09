@@ -1,8 +1,8 @@
-import { Product, customPrice, fixedPrice, freePrice } from "paac";
+import { Product, customPrice, fixedPrice, freePrice } from "pac";
 
 export const fixedRecurring = new Product("full-shape-fixed-recurring", {
   name: "E2E Full Shape Fixed Recurring",
-  description: "Full Product shape created by PAAC E2E",
+  description: "Full Product shape created by PAC E2E",
   visibility: "private",
   recurringInterval: "month",
   recurringIntervalCount: 2,
@@ -11,14 +11,14 @@ export const fixedRecurring = new Product("full-shape-fixed-recurring", {
 
 export const freeOneTime = new Product("full-shape-free", {
   name: "E2E Full Shape Free",
-  description: "Free Product price created by PAAC E2E",
+  description: "Free Product price created by PAC E2E",
   visibility: "public",
   prices: [freePrice({ currency: "usd" })],
 });
 
 export const customOneTime = new Product("full-shape-custom", {
   name: "E2E Full Shape Custom",
-  description: "Custom Product price created by PAAC E2E",
+  description: "Custom Product price created by PAC E2E",
   visibility: "draft",
   prices: [
     customPrice({

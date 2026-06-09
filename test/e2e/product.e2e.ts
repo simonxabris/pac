@@ -6,7 +6,7 @@ import {
   findProductByKey,
   findProductsByKey,
   getProductById,
-  paacMetadata,
+  pacMetadata,
 } from "./helpers/polar.js";
 
 type RemoteProductPrice = RemoteProduct["prices"][number];
@@ -29,14 +29,14 @@ const onlyActivePrice = (product: RemoteProduct): RemoteProductPrice => {
 };
 
 const expectManagedProduct = (product: RemoteProduct, key: string): void => {
-  expect(product.metadata.paac).toBe(paacMetadata("product", key));
+  expect(product.metadata.pac).toBe(pacMetadata("product", key));
 };
 
 describe("product e2e", () => {
   it("creates Products with the supported Product shape and price variants", async () => {
     const org = e2eOrganizationFromEnv();
 
-    await deployConfig("test/e2e/cases/product-full-shape/paac.config.ts", org.env);
+    await deployConfig("test/e2e/cases/product-full-shape/pac.config.ts", org.env);
 
     const fixedRecurring = requireProduct(
       await findProductByKey(org, "full-shape-fixed-recurring"),
@@ -45,7 +45,7 @@ describe("product e2e", () => {
     expectManagedProduct(fixedRecurring, "full-shape-fixed-recurring");
     expect(fixedRecurring).toMatchObject({
       name: "E2E Full Shape Fixed Recurring",
-      description: "Full Product shape created by PAAC E2E",
+      description: "Full Product shape created by PAC E2E",
       visibility: "private",
       recurringInterval: "month",
       recurringIntervalCount: 2,
@@ -65,7 +65,7 @@ describe("product e2e", () => {
     expectManagedProduct(freeOneTime, "full-shape-free");
     expect(freeOneTime).toMatchObject({
       name: "E2E Full Shape Free",
-      description: "Free Product price created by PAAC E2E",
+      description: "Free Product price created by PAC E2E",
       visibility: "public",
       recurringInterval: null,
       recurringIntervalCount: null,
@@ -84,7 +84,7 @@ describe("product e2e", () => {
     expectManagedProduct(customOneTime, "full-shape-custom");
     expect(customOneTime).toMatchObject({
       name: "E2E Full Shape Custom",
-      description: "Custom Product price created by PAAC E2E",
+      description: "Custom Product price created by PAC E2E",
       visibility: "draft",
       recurringInterval: null,
       recurringIntervalCount: null,
@@ -102,7 +102,7 @@ describe("product e2e", () => {
 
   it("deploys the same Product config idempotently", async () => {
     const org = e2eOrganizationFromEnv();
-    const config = "test/e2e/cases/product-idempotent/paac.config.ts";
+    const config = "test/e2e/cases/product-idempotent/pac.config.ts";
 
     await deployConfig(config, org.env);
     const productAfterFirstDeploy = requireProduct(

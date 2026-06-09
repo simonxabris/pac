@@ -44,7 +44,10 @@ describe("Meter", () => {
           unit: "scalar",
           customLabel: null,
           customMultiplier: null,
-          filter: { conjunction: "and", clauses: [{ property: "name", operator: "eq", value: "api_call" }] },
+          filter: {
+            conjunction: "and",
+            clauses: [{ property: "name", operator: "eq", value: "api_call" }],
+          },
           aggregation: { func: "count" },
         },
       });
@@ -61,7 +64,10 @@ describe("Meter", () => {
         aggregation: sum("bytes"),
       });
 
-      expect(meter.toDesiredResource().spec.aggregation).toEqual({ func: "sum", property: "bytes" });
+      expect(meter.toDesiredResource().spec.aggregation).toEqual({
+        func: "sum",
+        property: "bytes",
+      });
     });
 
     it("creates a meter with max aggregation", () => {
@@ -81,7 +87,10 @@ describe("Meter", () => {
         aggregation: min("latency_ms"),
       });
 
-      expect(meter.toDesiredResource().spec.aggregation).toEqual({ func: "min", property: "latency_ms" });
+      expect(meter.toDesiredResource().spec.aggregation).toEqual({
+        func: "min",
+        property: "latency_ms",
+      });
     });
 
     it("creates a meter with avg aggregation", () => {
@@ -91,7 +100,10 @@ describe("Meter", () => {
         aggregation: avg("latency_ms"),
       });
 
-      expect(meter.toDesiredResource().spec.aggregation).toEqual({ func: "avg", property: "latency_ms" });
+      expect(meter.toDesiredResource().spec.aggregation).toEqual({
+        func: "avg",
+        property: "latency_ms",
+      });
     });
 
     it("creates a meter with unique aggregation", () => {
@@ -101,7 +113,10 @@ describe("Meter", () => {
         aggregation: unique("user_id"),
       });
 
-      expect(meter.toDesiredResource().spec.aggregation).toEqual({ func: "unique", property: "user_id" });
+      expect(meter.toDesiredResource().spec.aggregation).toEqual({
+        func: "unique",
+        property: "user_id",
+      });
     });
   });
 
@@ -178,14 +193,22 @@ describe("Meter", () => {
     it("eventTimestamp() creates a filter clause with a string value", () => {
       const clause = eventTimestamp("gte", "2024-01-01T00:00:00Z");
 
-      expect(clause).toEqual({ property: "timestamp", operator: "gte", value: "2024-01-01T00:00:00Z" });
+      expect(clause).toEqual({
+        property: "timestamp",
+        operator: "gte",
+        value: "2024-01-01T00:00:00Z",
+      });
     });
 
     it("eventTimestamp() converts a Date object to ISO string", () => {
       const date = new Date("2024-06-15T12:00:00Z");
       const clause = eventTimestamp("lte", date);
 
-      expect(clause).toEqual({ property: "timestamp", operator: "lte", value: "2024-06-15T12:00:00.000Z" });
+      expect(clause).toEqual({
+        property: "timestamp",
+        operator: "lte",
+        value: "2024-06-15T12:00:00.000Z",
+      });
     });
 
     it("eventTimestamp() accepts a numeric timestamp", () => {
@@ -300,10 +323,7 @@ describe("Meter", () => {
     it("deeply nests filter groups", () => {
       const filter = and(
         eventName("eq", "event"),
-        or(
-          where("x", "eq", 1),
-          and(where("y", "eq", 2), where("z", "eq", 3)),
-        ),
+        or(where("x", "eq", 1), and(where("y", "eq", 2), where("z", "eq", 3))),
       );
 
       const spec = meterFilterSpec(filter);
@@ -346,12 +366,18 @@ describe("Meter", () => {
 
     it("converts property aggregations", () => {
       for (const func of ["sum", "max", "min", "avg"] as const) {
-        expect(meterAggregationSpec({ func, property: "bytes" })).toEqual({ func, property: "bytes" });
+        expect(meterAggregationSpec({ func, property: "bytes" })).toEqual({
+          func,
+          property: "bytes",
+        });
       }
     });
 
     it("converts unique aggregation", () => {
-      expect(meterAggregationSpec({ func: "unique", property: "user_id" })).toEqual({ func: "unique", property: "user_id" });
+      expect(meterAggregationSpec({ func: "unique", property: "user_id" })).toEqual({
+        func: "unique",
+        property: "user_id",
+      });
     });
   });
 
@@ -368,7 +394,10 @@ describe("Meter", () => {
         unit: "scalar",
         customLabel: null,
         customMultiplier: null,
-        filter: { conjunction: "and", clauses: [{ property: "name", operator: "eq", value: "click" }] },
+        filter: {
+          conjunction: "and",
+          clauses: [{ property: "name", operator: "eq", value: "click" }],
+        },
         aggregation: { func: "count" },
       });
     });
@@ -388,7 +417,10 @@ describe("Meter", () => {
         unit: "custom",
         customLabel: "GPT Tokens",
         customMultiplier: 1000,
-        filter: { conjunction: "or", clauses: [{ property: "model", operator: "eq", value: "gpt-4" }] },
+        filter: {
+          conjunction: "or",
+          clauses: [{ property: "model", operator: "eq", value: "gpt-4" }],
+        },
         aggregation: { func: "sum", property: "tokens" },
       });
     });

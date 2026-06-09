@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Product, fixedPrice, freePrice, customPrice, meteredUnitPrice, productSpec } from "./product.js";
+import {
+  Product,
+  fixedPrice,
+  freePrice,
+  customPrice,
+  meteredUnitPrice,
+  productSpec,
+} from "./product.js";
 import { Benefit } from "./benefit.js";
 import { Meter } from "./meter.js";
 import { resetRegistry } from "./registry.js";
@@ -193,7 +200,10 @@ describe("Product", () => {
     it("creates a product with a metered unit price referencing a meter by address string", () => {
       const meter = new Meter("api-calls", {
         name: "API Calls",
-        filter: { conjunction: "and", clauses: [{ property: "name", operator: "eq", value: "api_call" }] },
+        filter: {
+          conjunction: "and",
+          clauses: [{ property: "name", operator: "eq", value: "api_call" }],
+        },
         aggregation: { func: "count" },
       });
 
@@ -216,7 +226,14 @@ describe("Product", () => {
     it("creates a metered unit price with capAmount", () => {
       const product = new Product("capped-api", {
         name: "Capped API",
-        prices: [meteredUnitPrice({ meter: "meter.requests", amount: 0.05, currency: "usd", capAmount: "100" })],
+        prices: [
+          meteredUnitPrice({
+            meter: "meter.requests",
+            amount: 0.05,
+            currency: "usd",
+            capAmount: "100",
+          }),
+        ],
       });
 
       const resource = product.toDesiredResource();
@@ -272,7 +289,12 @@ describe("Product", () => {
           fixedPrice({ amount: "2000", currency: "usd" }),
           freePrice({ currency: "usd" }),
           customPrice({ currency: "usd", minimumAmount: "100", maximumAmount: "5000" }),
-          meteredUnitPrice({ meter: "meter.api-calls", amount: "0.10", currency: "usd", capAmount: "50" }),
+          meteredUnitPrice({
+            meter: "meter.api-calls",
+            amount: "0.10",
+            currency: "usd",
+            capAmount: "50",
+          }),
         ],
       });
 

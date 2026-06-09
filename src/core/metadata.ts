@@ -1,1 +1,1 @@
-export const PAAC_METADATA_KEY = "paac";
+export const PAC_METADATA_KEY = "pac";

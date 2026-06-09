@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { makeAddress, type ResourceAddress } from "../core/address.js";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import { MeterAddressSchema, type Meter, type MeterAddress } from "./meter.js";
 import { registerResource } from "./registry.js";
@@ -84,7 +84,7 @@ export const normalizeBenefitMetadata = (metadata: BenefitMetadata = {}): Benefi
 
   if (entries.length > 49) {
     throw new Error(
-      "Feature Flag Benefit metadata may contain at most 49 entries; PAAC reserves one metadata slot.",
+      "Feature Flag Benefit metadata may contain at most 49 entries; PAC reserves one metadata slot.",
     );
   }
 
@@ -97,9 +97,9 @@ export const normalizeBenefitMetadata = (metadata: BenefitMetadata = {}): Benefi
     if (key.length > 40) {
       throw new Error("Feature Flag Benefit metadata keys must be at most 40 characters.");
     }
-    if (key === PAAC_METADATA_KEY) {
+    if (key === PAC_METADATA_KEY) {
       throw new Error(
-        `Feature Flag Benefit metadata key '${PAAC_METADATA_KEY}' is reserved by PAAC.`,
+        `Feature Flag Benefit metadata key '${PAC_METADATA_KEY}' is reserved by PAC.`,
       );
     }
 

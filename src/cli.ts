@@ -54,9 +54,9 @@ const generateCommandLive = generateCommand.pipe(Command.provide(ResourceCommand
 const importCommandLive = importCommand.pipe(Command.provide(ResourceCommandLive));
 const authCommandLive = authCommand;
 
-const cli = Command.make("paac").pipe(
+const cli = Command.make("pac").pipe(
   Command.withSharedFlags({ env: polarRuntimeEnvFlag }),
-  Command.withDescription("Polar as code"),
+  Command.withDescription("Polar as code (PAC)"),
   Command.withSubcommands([
     planCommandLive,
     deployCommandLive,

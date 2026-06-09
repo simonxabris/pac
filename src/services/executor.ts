@@ -17,15 +17,15 @@ export class ExecutorRefResolutionError extends Schema.TaggedErrorClass<Executor
     field: Schema.Literal("polarId"),
     message: Schema.String,
   },
-) { }
+) {}
 
 type DeepResolved<T> = T extends OperationRef
   ? string
   : T extends ReadonlyArray<infer A>
-  ? ReadonlyArray<DeepResolved<A>>
-  : T extends object
-  ? { readonly [K in keyof T]: DeepResolved<T[K]> }
-  : T;
+    ? ReadonlyArray<DeepResolved<A>>
+    : T extends object
+      ? { readonly [K in keyof T]: DeepResolved<T[K]> }
+      : T;
 
 type ResolvedOperationAction = DeepResolved<OperationAction>;
 
@@ -46,7 +46,7 @@ const resolveRefs = <A>(
   value: A,
   bindings: ExecutionBindings,
 ): Effect.Effect<DeepResolved<A>, ExecutorRefResolutionError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     if (isOperationRef(value)) {
       const binding = bindings.get(value.address);
       if (binding === undefined) {
@@ -99,7 +99,7 @@ export class Executor extends Context.Service<
 >()("@app/Executor") {
   static readonly layer = Layer.effect(
     Executor,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const polar = yield* PolarClient;
 
       const executeResolvedAction = (
@@ -160,7 +160,7 @@ export class Executor extends Context.Service<
         Effect.forEach(
           [...rollbackStack].reverse(),
           (action) =>
-            Effect.gen(function*() {
+            Effect.gen(function* () {
               const resolvedAction = yield* resolveRefs(action, bindings);
               yield* executeResolvedAction(resolvedAction);
             }),
@@ -172,7 +172,7 @@ export class Executor extends Context.Service<
         bindings: ExecutionBindings,
       ): Effect.Effect<Exit.Exit<unknown, ExecutorError>> =>
         Effect.exit(
-          Effect.gen(function*() {
+          Effect.gen(function* () {
             const resolvedAction = yield* resolveRefs(operation.action, bindings);
             const result = yield* executeResolvedAction(resolvedAction);
             recordBinding(operation.address, result, bindings);
@@ -185,7 +185,7 @@ export class Executor extends Context.Service<
         bindings: ExecutionBindings,
         rollbackStack: Array<OperationAction>,
       ): Effect.Effect<Exit.Exit<void, ExecutorError>> =>
-        Effect.gen(function*() {
+        Effect.gen(function* () {
           for (const operation of operations) {
             const exit = yield* executeOperation(operation, bindings);
 
@@ -203,7 +203,7 @@ export class Executor extends Context.Service<
 
       return Executor.of({
         execute: (program) =>
-          Effect.gen(function*() {
+          Effect.gen(function* () {
             const bindings: ExecutionBindings = new Map(program.initialBindings);
             const rollbackStack: Array<OperationAction> = [];
 

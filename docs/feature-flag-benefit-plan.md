@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add PAAC support for Polar's `feature_flag` Benefit type using the existing standalone `Benefit` resource lifecycle.
+Add PAC support for Polar's `feature_flag` Benefit type using the existing standalone `Benefit` resource lifecycle.
 
 A Feature Flag Benefit is Polar's lightweight feature-gating primitive: if a customer has an active grant for the Benefit, the application should treat the feature as enabled. The grant is visible in Customer State and `customer.state_changed` webhook payloads as a benefit grant with `benefit_type: "feature_flag"` and `benefit_metadata`.
 
@@ -62,7 +62,7 @@ Polar metadata constraints on create/update:
 - values may be string, integer/number, or boolean;
 - no `null` values in create/update metadata.
 
-Because PAAC already reserves one metadata key named `paac`, user-supplied Feature Flag metadata should allow at most 49 entries and must reject the reserved key `paac`.
+Because PAC already reserves one metadata key named `pac`, user-supplied Feature Flag metadata should allow at most 49 entries and must reject the reserved key `pac`.
 
 ## Existing Pattern to Follow
 
@@ -84,10 +84,10 @@ The generic lifecycle is already in place:
 
 Feature Flag should be added as a third Benefit variant. No new resource kind, operation action, or executor branch is needed.
 
-## Proposed PAAC API
+## Proposed PAC API
 
 ```ts
-import { Benefit, Product, fixedPrice } from "paac";
+import { Benefit, Product, fixedPrice } from "pac";
 
 export const premiumFeatures = new Benefit("premium-features", {
   type: "feature-flag",
@@ -119,10 +119,7 @@ type FeatureFlagBenefitConfig = {
   readonly metadata?: Readonly<Record<string, BenefitMetadataValue>>;
 };
 
-type BenefitConfig =
-  | MeterCreditBenefitConfig
-  | CustomBenefitConfig
-  | FeatureFlagBenefitConfig;
+type BenefitConfig = MeterCreditBenefitConfig | CustomBenefitConfig | FeatureFlagBenefitConfig;
 ```
 
 Canonical spec variant:
@@ -134,29 +131,26 @@ type BenefitFeatureFlagSpec = {
   readonly metadata: Readonly<Record<string, BenefitMetadataValue>>;
 };
 
-type BenefitSpec =
-  | BenefitMeterCreditSpec
-  | BenefitCustomSpec
-  | BenefitFeatureFlagSpec;
+type BenefitSpec = BenefitMeterCreditSpec | BenefitCustomSpec | BenefitFeatureFlagSpec;
 ```
 
 Normalize missing `metadata` to `{}`. Sort metadata keys during normalization if practical so plans and tests stay deterministic.
 
 ## Metadata Ownership Decision
 
-Feature Flag metadata is not just incidental Polar metadata; it is the application-facing payload returned in Customer State and webhooks. Therefore, for `feature-flag` Benefits, PAAC should treat user metadata as a managed field.
+Feature Flag metadata is not just incidental Polar metadata; it is the application-facing payload returned in Customer State and webhooks. Therefore, for `feature-flag` Benefits, PAC should treat user metadata as a managed field.
 
 Rules:
 
-- PAAC continues to own the reserved `metadata.paac` key for Managed Resource identity.
-- `FeatureFlagBenefitConfig.metadata` owns all non-`paac` metadata keys on PAAC-managed Feature Flag Benefits.
-- Remote decoding strips `paac` before storing metadata in `BenefitFeatureFlagSpec`.
+- PAC continues to own the reserved `metadata.pac` key for Managed Resource identity.
+- `FeatureFlagBenefitConfig.metadata` owns all non-`pac` metadata keys on PAC-managed Feature Flag Benefits.
+- Remote decoding strips `pac` before storing metadata in `BenefitFeatureFlagSpec`.
 - Create/update payloads merge user metadata with `managedMetadata(...)`.
-- Reject user metadata containing a `paac` key.
+- Reject user metadata containing a `pac` key.
 - Reject more than 49 user metadata keys so the merged Polar metadata has at most 50 keys.
 - Do not add user metadata support to `meter-credit` or `custom` in this change unless deliberately broadening scope.
 
-This keeps PAAC metadata semantics compatible with `CONTEXT.md` while exposing the behavior Polar documents for Feature Flag Benefits.
+This keeps PAC metadata semantics compatible with `CONTEXT.md` while exposing the behavior Polar documents for Feature Flag Benefits.
 
 ## Step-by-Step Implementation Plan
 
@@ -193,7 +187,7 @@ Validation to add:
 - metadata string values length `1..500`;
 - metadata values: string, finite number, boolean;
 - metadata entry count `<= 49`;
-- reserved key `paac` is rejected.
+- reserved key `pac` is rejected.
 
 ### 2. Export the new public types
 
@@ -232,7 +226,7 @@ case "feature-flag":
   };
 ```
 
-Where `benefitMetadataPayload` merges user metadata and `managedMetadata(...)`, with `paac` protected.
+Where `benefitMetadataPayload` merges user metadata and `managedMetadata(...)`, with `pac` protected.
 
 Keep existing meter-credit and custom create payloads unchanged except for any helper extraction required to share metadata merging.
 
@@ -298,11 +292,11 @@ type BenefitUpdateOperationPayload =
   | BenefitFeatureFlagUpdateOperationPayload;
 ```
 
-Consider replacing `{ readonly paac: string }` with a shared `BenefitOperationMetadata` that permits PAAC plus feature-flag user metadata:
+Consider replacing `{ readonly pac: string }` with a shared `BenefitOperationMetadata` that permits PAC plus feature-flag user metadata:
 
 ```ts
 type BenefitOperationMetadata = Readonly<Record<string, string | number | boolean>> & {
-  readonly paac: string;
+  readonly pac: string;
 };
 ```
 
@@ -334,12 +328,12 @@ case "feature_flag":
     spec: {
       type: "feature-flag",
       description: benefit.description,
-      metadata: stripPaacMetadata(benefit.metadata),
+      metadata: stripPacMetadata(benefit.metadata),
     },
   };
 ```
 
-`stripPaacMetadata` should remove only the reserved `paac` key and validate/normalize the remaining values into the same canonical metadata shape used by desired resources.
+`stripPacMetadata` should remove only the reserved `pac` key and validate/normalize the remaining values into the same canonical metadata shape used by desired resources.
 
 ### 9. Extend remote Benefit encoding
 
@@ -362,7 +356,7 @@ case "feature-flag":
   };
 ```
 
-This encoding is mainly for schema round-trips/tests. It should represent user metadata only; PAAC metadata is added for API payloads, not as part of canonical spec.
+This encoding is mainly for schema round-trips/tests. It should represent user metadata only; PAC metadata is added for API payloads, not as part of canonical spec.
 
 ### 10. Leave Polar client and executor unchanged
 
@@ -393,7 +387,7 @@ Add coverage that:
   - empty key;
   - empty string value;
   - string value too long;
-  - reserved key `paac`;
+  - reserved key `pac`;
   - more than 49 entries.
 - existing meter-credit and custom behavior remains unchanged.
 
@@ -407,10 +401,10 @@ Add coverage that:
 - Feature Flag create operation emits:
   - `type: "feature_flag"`;
   - `properties: {}`;
-  - merged metadata containing user keys and `paac`.
+  - merged metadata containing user keys and `pac`.
 - description drift emits update payload with `description` only.
 - metadata drift emits update payload with merged `metadata` only.
-- rollback for metadata drift restores previous metadata plus `paac`.
+- rollback for metadata drift restores previous metadata plus `pac`.
 - matching Feature Flag specs plan as `Noop`.
 - type changes between Feature Flag and other Benefit variants are blocked as immutable.
 
@@ -421,7 +415,7 @@ There is currently no dedicated `remote-resource-fetcher` test file. Add one if 
 Test:
 
 - managed remote `feature_flag` decodes to `BenefitFeatureFlagSpec`.
-- `metadata.paac` is stripped from the canonical spec.
+- `metadata.pac` is stripped from the canonical spec.
 - user metadata round-trips through encode/decode.
 - `properties: {}` is accepted.
 - managed unsupported Benefit types are still rejected by the remote schema.

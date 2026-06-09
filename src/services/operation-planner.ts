@@ -27,7 +27,7 @@ export const lowerPlanNodesToOperationGroups = (
   nodes: PlanNodeMap,
   adapterRegistry: ResourceAdapterRegistryShape,
 ): Effect.Effect<LoweredPlanNodes, MissingResourceAdapter | ResourceAdapterPlanError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const groups: Array<OperationGroup> = [];
     const groupsByAddress = new Map<ResourceAddress, OperationGroup>();
     const operations: Array<Operation> = [];
@@ -91,7 +91,7 @@ export class PlanNotExecutable extends Schema.TaggedErrorClass<PlanNotExecutable
     blockedAddresses: Schema.Array(ResourceAddressSchema),
     diagnosticCodes: Schema.Array(Schema.String),
   },
-) { }
+) {}
 
 const buildOperationConstraints = (
   plan: Plan,
@@ -244,12 +244,12 @@ export class OperationPlanner extends Context.Service<
 >()("@app/OperationPlanner") {
   static readonly layer = Layer.effect(
     OperationPlanner,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const adapterRegistry = yield* ResourceAdapterRegistry;
 
       return OperationPlanner.of({
         create: (plan) =>
-          Effect.gen(function*() {
+          Effect.gen(function* () {
             yield* assertPlanExecutable(plan);
 
             const lowered = yield* lowerPlanNodesToOperationGroups(plan.nodes, adapterRegistry);

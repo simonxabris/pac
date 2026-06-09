@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import { BenefitResourceAdapter } from "./benefit-adapter.js";
 import {
   Benefit,
@@ -261,7 +261,7 @@ describe("BenefitResourceAdapter", () => {
             _tag: "CreateBenefit",
             payload: {
               metadata: {
-                [PAAC_METADATA_KEY]: JSON.stringify({
+                [PAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "benefit",
                   addr: "benefit.included-requests",
@@ -319,7 +319,7 @@ describe("BenefitResourceAdapter", () => {
         _tag: "CreateBenefit",
         payload: {
           metadata: {
-            [PAAC_METADATA_KEY]: JSON.stringify({
+            [PAC_METADATA_KEY]: JSON.stringify({
               v: 1,
               kind: "benefit",
               addr: "benefit.onboarding",
@@ -359,7 +359,7 @@ describe("BenefitResourceAdapter", () => {
             beta: true,
             seats: 10,
             tier: "pro",
-            [PAAC_METADATA_KEY]: JSON.stringify({
+            [PAC_METADATA_KEY]: JSON.stringify({
               v: 1,
               kind: "benefit",
               addr: "benefit.premium-features",
@@ -451,7 +451,7 @@ describe("BenefitResourceAdapter", () => {
           type: "feature_flag",
           metadata: {
             tier: "pro",
-            [PAAC_METADATA_KEY]: JSON.stringify({
+            [PAC_METADATA_KEY]: JSON.stringify({
               v: 1,
               kind: "benefit",
               addr: "benefit.premium-features",
@@ -469,7 +469,7 @@ describe("BenefitResourceAdapter", () => {
             type: "feature_flag",
             metadata: {
               tier: "basic",
-              [PAAC_METADATA_KEY]: JSON.stringify({
+              [PAC_METADATA_KEY]: JSON.stringify({
                 v: 1,
                 kind: "benefit",
                 addr: "benefit.premium-features",

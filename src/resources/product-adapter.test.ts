@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "@effect/vitest";
 import { Effect } from "effect";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import { ProductResourceAdapter } from "./product-adapter.js";
 import {
   customPrice,
@@ -70,7 +70,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
             _tag: "CreateProduct",
             payload: {
               metadata: {
-                [PAAC_METADATA_KEY]: JSON.stringify({
+                [PAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "product",
                   addr: "product.pro",
@@ -208,7 +208,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
             _tag: "CreateProduct",
             payload: {
               metadata: {
-                [PAAC_METADATA_KEY]: JSON.stringify({
+                [PAC_METADATA_KEY]: JSON.stringify({
                   v: 1,
                   kind: "product",
                   addr: "product.pro",

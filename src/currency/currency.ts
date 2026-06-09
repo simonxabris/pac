@@ -127,7 +127,7 @@ export const PRESENTMENT_CURRENCIES = [
   "zmw",
 ] as const;
 
-export type PresentmentCurrency = typeof PRESENTMENT_CURRENCIES[number];
+export type PresentmentCurrency = (typeof PRESENTMENT_CURRENCIES)[number];
 export type CurrencyAmountInput = string | number | bigint;
 
 const PRESENTMENT_CURRENCY_SET: ReadonlySet<string> = new Set(PRESENTMENT_CURRENCIES);
@@ -192,7 +192,9 @@ const parseNonNegativeDecimal = (input: CurrencyAmountInput): DecimalParts => {
 
   const match = decimalPattern.exec(text);
   if (match === null) {
-    throw new Error(`Currency amount must be a decimal string without exponent notation, got '${text}'.`);
+    throw new Error(
+      `Currency amount must be a decimal string without exponent notation, got '${text}'.`,
+    );
   }
 
   const whole = match[1] ?? "0";
@@ -247,32 +249,31 @@ const shiftDecimalLeft = (input: CurrencyAmountInput, places: number): DecimalPa
 
 const assertIntegerDecimal = (amount: DecimalParts, source: CurrencyAmountInput): string => {
   if (/[^0]/.test(amount.fraction)) {
-    throw new Error(`Currency amount '${String(source)}' cannot be represented as integer minor units.`);
+    throw new Error(
+      `Currency amount '${String(source)}' cannot be represented as integer minor units.`,
+    );
   }
   return stripLeadingZeroes(amount.whole);
 };
 
-const decimalFactorPlaces = (currency: string): 0 | 2 => currencyDecimalFactor(currency) === "1" ? 0 : 2;
+const decimalFactorPlaces = (currency: string): 0 | 2 =>
+  currencyDecimalFactor(currency) === "1" ? 0 : 2;
 
-export const majorToMinorUnitAmount = (
-  amount: CurrencyAmountInput,
-  currency: string,
-): string => assertIntegerDecimal(shiftDecimalRight(amount, decimalFactorPlaces(currency)), amount);
+export const majorToMinorUnitAmount = (amount: CurrencyAmountInput, currency: string): string =>
+  assertIntegerDecimal(shiftDecimalRight(amount, decimalFactorPlaces(currency)), amount);
 
 export const optionalMajorToMinorUnitAmount = (
   amount: CurrencyAmountInput | null | undefined,
   currency: string,
-): string | null => amount == null ? null : majorToMinorUnitAmount(amount, currency);
+): string | null => (amount == null ? null : majorToMinorUnitAmount(amount, currency));
 
-export const minorToMajorUnitAmount = (
-  amount: CurrencyAmountInput,
-  currency: string,
-): string => formatDecimal(shiftDecimalLeft(amount, decimalFactorPlaces(currency)));
+export const minorToMajorUnitAmount = (amount: CurrencyAmountInput, currency: string): string =>
+  formatDecimal(shiftDecimalLeft(amount, decimalFactorPlaces(currency)));
 
 export const optionalMinorToMajorUnitAmount = (
   amount: CurrencyAmountInput | null | undefined,
   currency: string,
-): string | null => amount == null ? null : minorToMajorUnitAmount(amount, currency);
+): string | null => (amount == null ? null : minorToMajorUnitAmount(amount, currency));
 
 export type FormatCurrencyAmountOptions = {
   readonly locale?: Intl.LocalesArgument;
@@ -324,7 +325,7 @@ export const polarIntegerMinorUnitAmount = (
 export const optionalPolarIntegerMinorUnitAmount = (
   amount: CurrencyAmountInput | null | undefined,
   currency: string,
-): string | null => amount == null ? null : polarIntegerMinorUnitAmount(amount, currency);
+): string | null => (amount == null ? null : polarIntegerMinorUnitAmount(amount, currency));
 
 export const majorToMinorUnitDecimalAmount = (
   amount: CurrencyAmountInput,
@@ -354,4 +355,4 @@ export const polarIntegerMinorUnitNumber = (
 export const optionalPolarIntegerMinorUnitNumber = (
   amount: CurrencyAmountInput | null | undefined,
   currency: string,
-): number | null => amount == null ? null : polarIntegerMinorUnitNumber(amount, currency);
+): number | null => (amount == null ? null : polarIntegerMinorUnitNumber(amount, currency));

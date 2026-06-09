@@ -13,5 +13,6 @@ ignoredBuiltDependencies:
 
 allowBuilds:
   esbuild: true
+  lefthook: true
   msgpackr-extract: false
   protobufjs: false

@@ -87,15 +87,15 @@ export type PlanNode =
 
 export type ResourceDiffResult =
   | {
-    readonly _tag: "Planned";
-    readonly node: UpdatePlanNode | NoopPlanNode;
-    readonly diagnostics: ReadonlyArray<Diagnostic>;
-  }
+      readonly _tag: "Planned";
+      readonly node: UpdatePlanNode | NoopPlanNode;
+      readonly diagnostics: ReadonlyArray<Diagnostic>;
+    }
   | {
-    readonly _tag: "Blocked";
-    readonly node: BlockedPlanNode;
-    readonly diagnostics: ReadonlyArray<Diagnostic>;
-  };
+      readonly _tag: "Blocked";
+      readonly node: BlockedPlanNode;
+      readonly diagnostics: ReadonlyArray<Diagnostic>;
+    };
 
 export type PlanNodeMap = ReadonlyMap<ResourceAddress, PlanNode>;
 
@@ -113,10 +113,11 @@ type PendingDependency = {
 
 const cycleKey = (cycle: ReadonlyArray<ResourceAddress>): string => {
   const cycleWithoutRepeatedStart = cycle.slice(0, -1);
-  const rotations = cycleWithoutRepeatedStart.map((_, index) => [
-    ...cycleWithoutRepeatedStart.slice(index),
-    ...cycleWithoutRepeatedStart.slice(0, index),
-  ].join("->"));
+  const rotations = cycleWithoutRepeatedStart.map((_, index) =>
+    [...cycleWithoutRepeatedStart.slice(index), ...cycleWithoutRepeatedStart.slice(0, index)].join(
+      "->",
+    ),
+  );
 
   return rotations.sort()[0] ?? cycle.join("->");
 };
@@ -187,23 +188,20 @@ export class DuplicateDesiredResourceAddress extends Schema.TaggedErrorClass<Dup
   {
     address: ResourceAddressSchema,
   },
-) { }
+) {}
 
 export class DuplicateCurrentResourceAddress extends Schema.TaggedErrorClass<DuplicateCurrentResourceAddress>()(
   "DuplicateCurrentResourceAddress",
   {
     address: ResourceAddressSchema,
   },
-) { }
+) {}
 
-export class PlanNotUpToDate extends Schema.TaggedErrorClass<PlanNotUpToDate>()(
-  "PlanNotUpToDate",
-  {
-    nodeCount: Schema.Number,
-    diagnosticCount: Schema.Number,
-    message: Schema.String,
-  },
-) { }
+export class PlanNotUpToDate extends Schema.TaggedErrorClass<PlanNotUpToDate>()("PlanNotUpToDate", {
+  nodeCount: Schema.Number,
+  diagnosticCount: Schema.Number,
+  message: Schema.String,
+}) {}
 
 const assertPlanUpToDate = (plan: Plan): Effect.Effect<void, PlanNotUpToDate> => {
   const nonNoopNodes = [...plan.nodes.values()].filter((node) => node._tag !== "Noop");
@@ -217,8 +215,7 @@ const assertPlanUpToDate = (plan: Plan): Effect.Effect<void, PlanNotUpToDate> =>
     new PlanNotUpToDate({
       nodeCount: nonNoopNodes.length,
       diagnosticCount: errorDiagnostics.length,
-      message:
-        "Cannot continue because the PAAC config is not fully in sync with Polar.",
+      message: "Cannot continue because the PAC config is not fully in sync with Polar.",
     }),
   );
 };
@@ -226,7 +223,7 @@ const assertPlanUpToDate = (plan: Plan): Effect.Effect<void, PlanNotUpToDate> =>
 export const indexDesiredResources = (
   desiredResources: ReadonlyArray<DesiredResource>,
 ): Effect.Effect<DesiredResourceMap, DuplicateDesiredResourceAddress> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const byAddress = new Map<ResourceAddress, DesiredResource>();
 
     for (const resource of desiredResources) {
@@ -243,7 +240,7 @@ export const indexDesiredResources = (
 export const indexCurrentResources = (
   currentResources: ReadonlyArray<CurrentResource>,
 ): Effect.Effect<CurrentResourceMap, DuplicateCurrentResourceAddress> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const byAddress = new Map<ResourceAddress, CurrentResource>();
 
     for (const resource of currentResources) {
@@ -274,13 +271,13 @@ export class Planner extends Context.Service<
 >()("@app/Planner") {
   static readonly layer = Layer.effect(
     Planner,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const adapterRegistry = yield* ResourceAdapterRegistry;
 
       return Planner.of({
         assertPlanUpToDate,
         plan: ({ desiredResources, currentResources }) =>
-          Effect.gen(function*() {
+          Effect.gen(function* () {
             const desiredResourcesByAddress = yield* indexDesiredResources(desiredResources);
             const currentResourcesByAddress = yield* indexCurrentResources(currentResources);
             const nodes = new Map<ResourceAddress, PlanNode>();

@@ -5,7 +5,7 @@ import { AppConfig } from "../services/app-config.js";
 import { OAuth } from "../services/oauth.js";
 
 const loginCommand = Command.make("login", {}, () =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const config = yield* AppConfig;
     const server = config.polarEnv;
     const oauth = yield* OAuth;
@@ -19,7 +19,7 @@ const loginCommand = Command.make("login", {}, () =>
 ).pipe(Command.withDescription("Log in to Polar with OAuth"));
 
 const logoutCommand = Command.make("logout", {}, () =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const oauth = yield* OAuth;
     yield* oauth.logout();
     yield* Console.log("Successfully logged out of Polar");
@@ -27,7 +27,7 @@ const logoutCommand = Command.make("logout", {}, () =>
 ).pipe(Command.withDescription("Log out of Polar"));
 
 const whoamiCommand = Command.make("whoami", {}, () =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const config = yield* AppConfig;
     const server = config.polarEnv;
     const oauth = yield* OAuth;
@@ -52,7 +52,7 @@ const whoamiCommand = Command.make("whoami", {}, () =>
 ).pipe(Command.withDescription("Show the current Polar login and selected organization"));
 
 const orgCommand = Command.make("org", {}, () =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const config = yield* AppConfig;
     const server = config.polarEnv;
     const oauth = yield* OAuth;

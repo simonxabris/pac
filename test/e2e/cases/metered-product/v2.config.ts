@@ -8,7 +8,7 @@ import {
   meteredUnitPrice,
   or,
   sum,
-} from "paac";
+} from "pac";
 
 export const requests = new Meter("metered-product-requests", {
   name: "E2E Metered Product Requests V2",

@@ -2,9 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { OperationPlanner, PlanNotExecutable } from "./operation-planner.js";
 import type { Operation } from "../operations/operation.js";
-import type {
-  ResourceAddress,
-} from "../core/address.js";
+import type { ResourceAddress } from "../core/address.js";
 import type { ResourceKind } from "../core/kind.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
 import type {
@@ -53,9 +51,7 @@ const makeCurrentResource = <K extends ResourceKind, S>(
   spec,
 });
 
-const createNode = <K extends ResourceKind, S>(
-  desired: DesiredResource<K, S>,
-): CreatePlanNode => ({
+const createNode = <K extends ResourceKind, S>(desired: DesiredResource<K, S>): CreatePlanNode => ({
   _tag: "Create",
   address: desired.address,
   kind: desired.kind,
@@ -123,7 +119,9 @@ const dependsOn = (from: ResourceAddress, to: ResourceAddress): PlanEdge => ({
   to,
 });
 
-const desiredResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArray<DesiredResource> =>
+const desiredResourcesFromNodes = (
+  nodes: ReadonlyArray<PlanNode>,
+): ReadonlyArray<DesiredResource> =>
   nodes.flatMap((node) => {
     switch (node._tag) {
       case "Create":
@@ -137,7 +135,9 @@ const desiredResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArra
     }
   });
 
-const currentResourcesFromNodes = (nodes: ReadonlyArray<PlanNode>): ReadonlyArray<CurrentResource> =>
+const currentResourcesFromNodes = (
+  nodes: ReadonlyArray<PlanNode>,
+): ReadonlyArray<CurrentResource> =>
   nodes.flatMap((node) => {
     switch (node._tag) {
       case "Update":
@@ -165,9 +165,13 @@ const buildPlan = (input: {
     edges: input.edges ?? [],
     diagnostics: input.diagnostics ?? [],
     desiredResources,
-    desiredResourcesByAddress: new Map(desiredResources.map((resource) => [resource.address, resource])),
+    desiredResourcesByAddress: new Map(
+      desiredResources.map((resource) => [resource.address, resource]),
+    ),
     currentResources,
-    currentResourcesByAddress: new Map(currentResources.map((resource) => [resource.address, resource])),
+    currentResourcesByAddress: new Map(
+      currentResources.map((resource) => [resource.address, resource]),
+    ),
   };
 };
 
@@ -216,9 +220,7 @@ const simpleProductSpec: ProductSpec = {
 
 // --- Test layer ---
 
-const testLayer = OperationPlanner.layer.pipe(
-  Layer.provide(ResourceAdapterRegistryLive),
-);
+const testLayer = OperationPlanner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive));
 
 // --- Assertions ---
 
@@ -233,7 +235,7 @@ const operationSummary = (operations: ReadonlyArray<Operation>) =>
 
 describe("OperationPlanner.create", () => {
   it.effect("orders create dependencies before dependents", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meterDesired = makeDesiredResource("meter", "requests", simpleMeterSpec);
       const productDesired = makeDesiredResource("product", "pro", simpleProductSpec);
 
@@ -254,7 +256,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("orders Meter, Benefit, Product, and Product Benefit attachment creation", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meterDesired = makeDesiredResource("meter", "requests", simpleMeterSpec);
       const benefitDesired = makeDesiredResource("benefit", "included-requests", simpleBenefitSpec);
       const productDesired = makeDesiredResource("product", "pro", {
@@ -284,8 +286,13 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("orders Product, Benefit, and Meter removals in reverse dependency order", () =>
-    Effect.gen(function*() {
-      const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
+    Effect.gen(function* () {
+      const meterCurrent = makeCurrentResource(
+        "meter",
+        "requests",
+        "polar-meter-requests",
+        simpleMeterSpec,
+      );
       const benefitCurrent = makeCurrentResource(
         "benefit",
         "included-requests",
@@ -304,7 +311,11 @@ describe("OperationPlanner.create", () => {
       };
 
       const plan = buildPlan({
-        nodes: [removeNode(meterCurrent), removeNode(benefitCurrent, "delete"), removeNode(productCurrent)],
+        nodes: [
+          removeNode(meterCurrent),
+          removeNode(benefitCurrent, "delete"),
+          removeNode(productCurrent),
+        ],
         edges: [
           dependsOn("benefit.included-requests", "meter.requests"),
           dependsOn("product.pro", "benefit.included-requests"),
@@ -324,7 +335,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("lowers Product Benefit attachment drift as a Product update operation", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desiredSpec: ProductSpec = {
         ...simpleProductSpec,
         benefits: ["benefit.included-requests"],
@@ -376,9 +387,19 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("orders remove dependents before dependencies", () =>
-    Effect.gen(function*() {
-      const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
-      const productCurrent = makeCurrentResource("product", "pro", "polar-product-pro", simpleProductSpec);
+    Effect.gen(function* () {
+      const meterCurrent = makeCurrentResource(
+        "meter",
+        "requests",
+        "polar-meter-requests",
+        simpleMeterSpec,
+      );
+      const productCurrent = makeCurrentResource(
+        "product",
+        "pro",
+        "polar-product-pro",
+        simpleProductSpec,
+      );
 
       const plan = buildPlan({
         nodes: [removeNode(meterCurrent), removeNode(productCurrent)],
@@ -397,7 +418,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("plans Benefit create, update, and delete actions from Benefit plan nodes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const createDesired = makeDesiredResource("benefit", "new-benefit", {
         ...simpleBenefitSpec,
         description: "New Benefit",
@@ -442,7 +463,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("emits update operations for update nodes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = makeDesiredResource("product", "pro", simpleProductSpec);
       const current = makeCurrentResource("product", "pro", "polar-product-pro", {
         ...simpleProductSpec,
@@ -468,7 +489,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("preserves existing product prices by id when adding a new price", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const currentSpec: ProductSpec = {
         ...simpleProductSpec,
         prices: [{ type: "fixed", amount: "1000", currency: "usd" }],
@@ -515,17 +536,14 @@ describe("OperationPlanner.create", () => {
         _tag: "UpdateProduct",
         id: "polar-product-pro",
         payload: {
-          prices: [
-            { id: "price_existing_fixed" },
-            { amountType: "free", priceCurrency: "usd" },
-          ],
+          prices: [{ id: "price_existing_fixed" }, { amountType: "free", priceCurrency: "usd" }],
         },
       });
     }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("propagates missing-reference diagnostics from Benefit and Product dependencies", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const benefitDesired = makeDesiredResource("benefit", "included-requests", simpleBenefitSpec);
       const productDesired = makeDesiredResource("product", "pro", {
         ...simpleProductSpec,
@@ -543,14 +561,16 @@ describe("OperationPlanner.create", () => {
             severity: "error" as const,
             code: "dependency.missing",
             address: "benefit.included-requests",
-            message: "Resource benefit.included-requests depends on missing desired resource meter.requests.",
+            message:
+              "Resource benefit.included-requests depends on missing desired resource meter.requests.",
           },
           {
             _tag: "Diagnostic" as const,
             severity: "error" as const,
             code: "dependency.missing",
             address: "product.pro",
-            message: "Resource product.pro depends on missing desired resource benefit.included-requests.",
+            message:
+              "Resource product.pro depends on missing desired resource benefit.included-requests.",
           },
         ],
       });
@@ -581,13 +601,11 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("rejects plans with blocked nodes or error diagnostics", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const productDesired = makeDesiredResource("product", "pro", simpleProductSpec);
 
       const plan = buildPlan({
-        nodes: [
-          { ...blockedNode("product.pro", "product"), desired: productDesired },
-        ],
+        nodes: [{ ...blockedNode("product.pro", "product"), desired: productDesired }],
         diagnostics: [
           {
             _tag: "Diagnostic" as const,
@@ -618,9 +636,14 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("skips noop nodes", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const desired = makeDesiredResource("meter", "requests", simpleMeterSpec);
-      const current = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
+      const current = makeCurrentResource(
+        "meter",
+        "requests",
+        "polar-meter-requests",
+        simpleMeterSpec,
+      );
 
       const plan = buildPlan({
         nodes: [noopNode(desired, current)],
@@ -635,7 +658,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("creates initial bindings from current resources", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const meterDesired = makeDesiredResource("meter", "requests", simpleMeterSpec);
       const meterCurrent = makeCurrentResource(
         "meter",
@@ -663,12 +686,22 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("orders removal of dependent before dependency even without explicit edge", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       // When removing both a dependent and its dependency, the dependent
       // must be removed first regardless of edge direction, since the
       // dependency edge goes dependent -> dependency.
-      const meterCurrent = makeCurrentResource("meter", "requests", "polar-meter-requests", simpleMeterSpec);
-      const productCurrent = makeCurrentResource("product", "pro", "polar-product-pro", simpleProductSpec);
+      const meterCurrent = makeCurrentResource(
+        "meter",
+        "requests",
+        "polar-meter-requests",
+        simpleMeterSpec,
+      );
+      const productCurrent = makeCurrentResource(
+        "product",
+        "pro",
+        "polar-product-pro",
+        simpleProductSpec,
+      );
 
       const plan = buildPlan({
         nodes: [removeNode(meterCurrent), removeNode(productCurrent)],
@@ -686,7 +719,7 @@ describe("OperationPlanner.create", () => {
   );
 
   it.effect("detects operation ordering cycles", () =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const resA = makeDesiredResource("meter", "a", simpleMeterSpec);
       const resB = makeDesiredResource("meter", "b", simpleMeterSpec);
 
@@ -712,5 +745,4 @@ describe("OperationPlanner.create", () => {
       }
     }).pipe(Effect.provide(testLayer)),
   );
-
 });

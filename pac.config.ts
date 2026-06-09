@@ -1,7 +1,7 @@
-import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "paac";
+import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "pac";
 
 export const tokens = new Meter("tokens", {
-  name: "Paac tokens",
+  name: "Pac tokens",
   unit: "token",
   filter: and(eventName("eq", "token_consumed")),
   aggregation: sum("total_tokens"),
@@ -21,7 +21,7 @@ export const customBenefit = new Benefit("custom-note", {
 });
 
 export const pro = new Product("pro", {
-  name: "Paac Pro plan",
+  name: "Pac Pro plan",
   description: "For serious users",
   prices: [
     fixedPrice({ amount: "40", currency: "usd" }),

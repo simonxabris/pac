@@ -31,10 +31,8 @@ const meterCreatePayload = (
   aggregation: node.desired.spec.aggregation as MeterCreateOperationPayload["aggregation"],
 });
 
-const hasChanged = (
-  changes: ReadonlyArray<FieldChange>,
-  field: keyof MeterSpec,
-): boolean => changes.some((change) => change.path[0] === field);
+const hasChanged = (changes: ReadonlyArray<FieldChange>, field: keyof MeterSpec): boolean =>
+  changes.some((change) => change.path[0] === field);
 
 const meterUpdatePayload = (
   spec: MeterSpec,

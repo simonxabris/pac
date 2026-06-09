@@ -11,8 +11,8 @@ export const polarRuntimeEnvFlag = Flag.choice("env", ["production", "sandbox"] 
 );
 
 export const configFlag = Flag.string("config").pipe(
-  Flag.withDefault("paac.config.ts"),
-  Flag.withDescription("Path to the PAAC config file to load"),
+  Flag.withDefault("pac.config.ts"),
+  Flag.withDescription("Path to the PAC config file to load"),
 );
 
 export const allowDeleteFlag = Flag.boolean("allow-delete").pipe(
@@ -27,8 +27,8 @@ export const generatePathFlag = Flag.string("path").pipe(
 );
 
 export const importPathFlag = Flag.string("path").pipe(
-  Flag.withDefault("paac.config.ts"),
-  Flag.withDescription("Output path for the generated PAAC config file"),
+  Flag.withDefault("pac.config.ts"),
+  Flag.withDescription("Output path for the generated PAC config file"),
 );
 
 export const overwriteFlag = Flag.boolean("overwrite").pipe(
@@ -46,5 +46,5 @@ export const skipUnsupportedFlag = Flag.boolean("skip-unsupported").pipe(
 );
 
 export const forceFlag = Flag.boolean("force").pipe(
-  Flag.withDescription("Overwrite conflicting existing PAAC Metadata"),
+  Flag.withDescription("Overwrite conflicting existing PAC Metadata"),
 );

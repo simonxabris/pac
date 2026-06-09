@@ -13,10 +13,10 @@ pac is an IaC style solution for [polar](https://polar.sh)
 Define your products and pricing in code:
 
 ```ts
-import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "paac";
+import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "pac";
 
 export const tokens = new Meter("tokens", {
-  name: "Paac tokens",
+  name: "Pac tokens",
   unit: "token",
   filter: and(eventName("eq", "token_consumed")),
   aggregation: sum("total_tokens"),
@@ -30,7 +30,7 @@ export const includedTokens = new Benefit("included-tokens", {
 });
 
 export const pro = new Product("pro", {
-  name: "Paac Pro plan",
+  name: "Pac Pro plan",
   description: "For serious users",
   prices: [
     fixedPrice({ amount: "30", currency: "usd" }),
@@ -46,7 +46,7 @@ run the `deploy` command to create the resources.
 
 # Authentication
 
-`paac` supports two ways to authenticate with Polar:
+`pac` supports two ways to authenticate with Polar:
 
 ## OAuth
 
@@ -54,16 +54,16 @@ Use the built-in OAuth flow to log in interactively. This stores tokens securely
 
 ```sh
 # Log in (opens your browser)
-paac auth login
+pac auth login
 
 # Check who you're logged in as and which organization is active
-paac auth whoami
+pac auth whoami
 
 # Switch to a different organization
-paac auth org
+pac auth org
 
 # Log out and clear stored credentials
-paac auth logout
+pac auth logout
 ```
 
 Tokens are scoped per environment (`production` or `sandbox`). The login command stores the access token and your selected organization in the system keyring so you don't have to re-authenticate on every run.

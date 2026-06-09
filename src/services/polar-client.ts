@@ -51,7 +51,7 @@ export class PolarClientError extends Schema.TaggedErrorClass<PolarClientError>(
     operation: Schema.String,
     message: Schema.String,
   },
-) { }
+) {}
 
 const fromPromise = <A>(
   operation: string,
@@ -63,11 +63,11 @@ const fromPromise = <A>(
   });
 
 export class PolarClient extends Context.Service<PolarClient, PolarClientShape>()(
-  "@paac/PolarClient",
+  "@pac/PolarClient",
 ) {
   static readonly layer = Layer.effect(
     PolarClient,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const config = yield* AppConfig;
       let accessToken = config.polarAccessToken;
       let organizationId: string | undefined;

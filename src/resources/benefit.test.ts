@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import { Benefit, benefitSpec } from "./benefit.js";
 import { count, eventName, Meter, and } from "./meter.js";
 import { resetRegistry } from "./registry.js";
@@ -219,7 +219,7 @@ describe("Benefit", () => {
       benefitSpec({
         type: "feature-flag",
         description: "Premium Features",
-        metadata: { [PAAC_METADATA_KEY]: "reserved" },
+        metadata: { [PAC_METADATA_KEY]: "reserved" },
       }),
     ).toThrow();
 

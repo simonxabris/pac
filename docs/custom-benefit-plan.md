@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add PAAC support for Polar's `custom` Benefit type, using the same `Benefit` resource lifecycle that currently supports `meter-credit` Benefits.
+Add PAC support for Polar's `custom` Benefit type, using the same `Benefit` resource lifecycle that currently supports `meter-credit` Benefits.
 
 Custom Benefits let a merchant attach a customer-visible private Markdown note to a paying customer. Typical uses are onboarding links, private support contact details, coupon codes, or post-purchase instructions.
 
@@ -41,7 +41,7 @@ Important behavior from Polar docs:
 - The customer-facing title is the Benefit `description`.
 - The private customer content is `properties.note`.
 - The note supports Markdown.
-- This type should not be positioned as PAAC's feature-gating primitive; use PAAC's `feature-flag` Benefit support for that.
+- This type should not be positioned as PAC's feature-gating primitive; use PAC's `feature-flag` Benefit support for that.
 
 ## Existing Meter-Credit Support to Reuse
 
@@ -60,10 +60,10 @@ Current implementation points:
 
 The generic Benefit resource shape and operation actions do not need a new resource kind. Add a second discriminant variant beside `meter-credit`.
 
-## Proposed PAAC API
+## Proposed PAC API
 
 ```ts
-import { Benefit, Product, fixedPrice } from "paac";
+import { Benefit, Product, fixedPrice } from "pac";
 
 export const onboarding = new Benefit("onboarding", {
   type: "custom",
@@ -87,9 +87,7 @@ type CustomBenefitConfig = {
   readonly note?: string | null;
 };
 
-type BenefitConfig =
-  | MeterCreditBenefitConfig
-  | CustomBenefitConfig;
+type BenefitConfig = MeterCreditBenefitConfig | CustomBenefitConfig;
 ```
 
 Canonical spec:
@@ -101,9 +99,7 @@ type BenefitCustomSpec = {
   readonly note: string | null;
 };
 
-type BenefitSpec =
-  | BenefitMeterCreditSpec
-  | BenefitCustomSpec;
+type BenefitSpec = BenefitMeterCreditSpec | BenefitCustomSpec;
 ```
 
 Default `note` to `null`, matching Polar's nullable field and keeping the canonical spec explicit.
@@ -196,7 +192,7 @@ type BenefitCustomPropertiesOperationPayload = BenefitCustomCreate["properties"]
 
 - Change `BenefitCreateOperationPayload` into a union of:
   - the existing meter-credit create payload with resolvable `meterId`
-  - a custom create payload with PAAC metadata
+  - a custom create payload with PAC metadata
 - Change `BenefitUpdateOperationPayload` into a union of:
   - the existing meter-credit update payload with resolvable `meterId`
   - `BenefitCustomUpdate`

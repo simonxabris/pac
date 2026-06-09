@@ -12,7 +12,10 @@ import {
   Planner,
   PlanNotUpToDate,
 } from "../services/planner.js";
-import { MissingResourceAdapter, ResourceAdapterPlanError } from "../services/resource-adapter-registry.js";
+import {
+  MissingResourceAdapter,
+  ResourceAdapterPlanError,
+} from "../services/resource-adapter-registry.js";
 import {
   DuplicateRemoteResourceAddress,
   RemoteResourceFetcher,
@@ -137,11 +140,11 @@ export class GenerateCommand extends Context.Service<
               Effect.tapError((error) =>
                 Effect.gen(function* () {
                   yield* Console.log(
-                    "Cannot generate runtime file because the PAAC config is not fully in sync with Polar.",
+                    "Cannot generate runtime file because the PAC config is not fully in sync with Polar.",
                   );
                   yield* Console.log(error.message);
                   yield* Console.log(
-                    "Run `paac plan` to inspect changes or `paac deploy` to apply them.",
+                    "Run `pac plan` to inspect changes or `pac deploy` to apply them.",
                   );
                 }),
               ),

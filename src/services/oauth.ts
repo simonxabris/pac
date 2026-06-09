@@ -83,7 +83,7 @@ export type OAuthShape = {
 export class OAuthError extends Schema.TaggedErrorClass<OAuthError>()("OAuthError", {
   message: Schema.String,
   cause: Schema.Defect(),
-}) { }
+}) {}
 
 const SANDBOX_CLIENT_ID = "polar_ci_AHVAKf9SDOaffma2auRGMXR3H8jg9QBgOfW7s1hYgW9";
 const PRODUCTION_CLIENT_ID = "polar_ci_gBnJ_Yv_uSGm5mtoPa2cCA";
@@ -94,8 +94,8 @@ const PRODUCTION_AUTHORIZATION_URL = "https://polar.sh/oauth2/authorize";
 const SANDBOX_TOKEN_URL = "https://sandbox-api.polar.sh/v1/oauth2/token";
 const PRODUCTION_TOKEN_URL = "https://api.polar.sh/v1/oauth2/token";
 
-const TOKEN_KEYRING_SERVICE = "paac.polar.oauth";
-const SELECTED_ORGANIZATION_KEYRING_SERVICE = "paac.polar.selected-organization";
+const TOKEN_KEYRING_SERVICE = "pac.polar.oauth";
+const SELECTED_ORGANIZATION_KEYRING_SERVICE = "pac.polar.selected-organization";
 
 const config = {
   scopes: [
@@ -172,7 +172,7 @@ const selectedOrganizationEntry = (environment: PolarEnvironment) =>
   new AsyncEntry(SELECTED_ORGANIZATION_KEYRING_SERVICE, environment);
 
 const readToken = (server: PolarEnvironment): Effect.Effect<Token | undefined, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const raw = yield* Effect.tryPromise({
       try: () => tokenEntry(server).getPassword(),
       catch: (cause) => new OAuthError({ message: "Failed to read token from keyring", cause }),
@@ -196,7 +196,7 @@ const readToken = (server: PolarEnvironment): Effect.Effect<Token | undefined, O
     );
   });
 
-const readTokens: Effect.Effect<Tokens, OAuthError> = Effect.gen(function*() {
+const readTokens: Effect.Effect<Tokens, OAuthError> = Effect.gen(function* () {
   const production = yield* readToken("production");
   const sandbox = yield* readToken("sandbox");
   return Tokens.make({
@@ -206,7 +206,7 @@ const readTokens: Effect.Effect<Tokens, OAuthError> = Effect.gen(function*() {
 });
 
 const saveToken = (token: Token): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const encoded = yield* Schema.encodeUnknownEffect(Token)(token).pipe(
       Effect.mapError((cause) => new OAuthError({ message: "Failed to encode token", cause })),
     );
@@ -230,7 +230,7 @@ const deleteToken = (server: PolarEnvironment): Effect.Effect<void, OAuthError> 
 const getSelectedOrganization = (
   server: PolarEnvironment,
 ): Effect.Effect<SelectedOrganization | undefined, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const raw = yield* Effect.tryPromise({
       try: () => selectedOrganizationEntry(server).getPassword(),
       catch: (cause) =>
@@ -259,7 +259,7 @@ const getSelectedOrganization = (
 const saveSelectedOrganization = (
   organization: SelectedOrganization,
 ): Effect.Effect<SelectedOrganization, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const encoded = yield* Schema.encodeUnknownEffect(SelectedOrganization)(organization).pipe(
       Effect.mapError(
         (cause) => new OAuthError({ message: "Failed to encode selected organization", cause }),
@@ -297,7 +297,7 @@ const logout = (): Effect.Effect<void, OAuthError> =>
   ).pipe(Effect.asVoid);
 
 const getAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const tokens = yield* readTokens;
     const token = tokens[server];
 
@@ -312,26 +312,26 @@ const getAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthErr
   });
 
 const login = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const token = yield* captureAccessTokenFromHTTPServer(server);
     const user = yield* fetchLoggedInUser(server, token);
     return yield* saveToken({ ...token, user });
   });
 
 const refresh = (token: Token): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const refreshedToken = yield* refreshAccessToken(token);
     return yield* saveToken(token.user ? { ...refreshedToken, user: token.user } : refreshedToken);
   });
 
 const isAuthenticated = (server: PolarEnvironment): Effect.Effect<boolean, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const token = yield* readToken(server);
     return token ? token.expiresAt > new Date() : false;
   });
 
 const resolveAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const token = yield* readToken(server);
 
     if (!token) {
@@ -349,7 +349,7 @@ const fetchLoggedInUser = (
   server: PolarEnvironment,
   token: Token,
 ): Effect.Effect<LoggedInUser, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const sdk = createPolarClient(server, token);
     const userinfo = yield* Effect.tryPromise({
       try: () => sdk.oauth2.userinfo(),
@@ -384,7 +384,7 @@ const createPolarClient = (server: PolarEnvironment, token: Token): Polar =>
 const listOrganizations = (
   server: PolarEnvironment,
 ): Effect.Effect<ReadonlyArray<SelectedOrganization>, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const token = yield* resolveAccessToken(server);
     const sdk = createPolarClient(server, token);
 
@@ -410,7 +410,7 @@ const listOrganizations = (
 const selectOrganization = (
   server: PolarEnvironment,
 ): Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const organizations = yield* listOrganizations(server);
 
     if (organizations.length === 0) {
@@ -447,12 +447,12 @@ const selectOrganization = (
 const resolveSelectedOrganization = (
   server: PolarEnvironment,
 ): Effect.Effect<SelectedOrganization, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const organization = yield* getSelectedOrganization(server);
 
     if (!organization) {
       return yield* new OAuthError({
-        message: `No Polar organization selected for ${server}. Run "paac auth org --env ${server}" to select an organization.`,
+        message: `No Polar organization selected for ${server}. Run "pac auth org --env ${server}" to select an organization.`,
         cause: undefined,
       });
     }
@@ -463,7 +463,7 @@ const resolveSelectedOrganization = (
 const captureAccessTokenFromHTTPServer = (
   server: PolarEnvironment,
 ): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const codeVerifier = yield* generateRandomString;
     const codeChallenge = yield* generateHash(codeVerifier);
     const state = yield* generateRandomString;
@@ -560,7 +560,7 @@ const buildAuthorizationUrl = (
 const getLoginResult = (
   responseUrl: string,
 ): Effect.Effect<readonly [string, string], OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const url = new URL(responseUrl, config.redirectUrl);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
@@ -576,7 +576,7 @@ const getLoginResult = (
   });
 
 const refreshAccessToken = (token: Token): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const refreshToken = token.refreshToken;
 
     if (!refreshToken) {
@@ -606,7 +606,7 @@ const redeemCodeForAccessToken = (
   requestState: string,
   codeVerifier: string,
 ): Effect.Effect<Token, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const [code, responseState] = yield* getLoginResult(responseUrl);
 
     if (responseState !== requestState) {
@@ -639,7 +639,7 @@ const postTokenRequest = (
   params: URLSearchParams,
   operation: string,
 ): Effect.Effect<KeysToSnakeCase<TokenResponse>, OAuthError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
       try: () =>
         fetch(url, {
@@ -697,7 +697,7 @@ const openBrowser = (url: string): void => {
   child.unref();
 };
 
-export class OAuth extends Context.Service<OAuth, OAuthShape>()("@paac/OAuth") {
+export class OAuth extends Context.Service<OAuth, OAuthShape>()("@pac/OAuth") {
   static readonly layer = Layer.succeed(
     OAuth,
     OAuth.of({

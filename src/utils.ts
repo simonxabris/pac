@@ -1,11 +1,11 @@
 import { Option, Schema } from "effect";
 
-const PaacMetadataContainer = Schema.Struct({
-  metadata: Schema.Struct({ paac: Schema.Unknown }),
+const PacMetadataContainer = Schema.Struct({
+  metadata: Schema.Struct({ pac: Schema.Unknown }),
 });
 
-export const hasPaacMetadata = (remote: unknown): boolean =>
-  Option.isSome(Schema.decodeUnknownOption(PaacMetadataContainer)(remote));
+export const hasPacMetadata = (remote: unknown): boolean =>
+  Option.isSome(Schema.decodeUnknownOption(PacMetadataContainer)(remote));
 
 export const errorMessage = (cause: unknown): string => {
   if (cause instanceof Error) return cause.message;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { PAAC_METADATA_KEY } from "../core/metadata.js";
+import { PAC_METADATA_KEY } from "../core/metadata.js";
 import { Executor } from "./executor.js";
 import type { OperationProgram } from "../types/operation-planner-types.js";
 import type { OperationAction } from "../operations/actions.js";
@@ -164,7 +164,7 @@ const bindings = (
 ): ResourceBindings => new Map(entries);
 
 const metadata = (kind: ResourceKind, key: string) => ({
-  [PAAC_METADATA_KEY]: JSON.stringify({
+  [PAC_METADATA_KEY]: JSON.stringify({
     v: 1,
     kind,
     addr: `${kind}.${key}`,

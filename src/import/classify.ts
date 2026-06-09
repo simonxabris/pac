@@ -6,7 +6,7 @@ import {
   MetadataRecord,
   type ManagedIdentity,
 } from "../services/remote-resource-fetcher.js";
-import { errorMessage, hasPaacMetadata } from "../utils.js";
+import { errorMessage, hasPacMetadata } from "../utils.js";
 
 const ManagedIdentitySchema = Schema.Struct({
   version: Schema.Literal(1),
@@ -135,11 +135,11 @@ const classifyImportResource = ({
 
   if (!supported) {
     return ImportResourceClassification.cases.Unsupported.make({
-      reason: "Remote resource is not supported by PAAC import yet.",
+      reason: "Remote resource is not supported by PAC import yet.",
     });
   }
 
-  if (!hasPaacMetadata({ metadata })) {
+  if (!hasPacMetadata({ metadata })) {
     return ImportResourceClassification.cases.Unmanaged.make({});
   }
 

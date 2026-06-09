@@ -4,11 +4,11 @@ import type { BenefitFeatureFlagCreate } from "@polar-sh/sdk/models/components/b
 import type { BenefitFeatureFlagUpdate } from "@polar-sh/sdk/models/components/benefitfeatureflagupdate.js";
 import type { BenefitMeterCreditCreate } from "@polar-sh/sdk/models/components/benefitmetercreditcreate.js";
 import type { BenefitMeterCreditUpdate } from "@polar-sh/sdk/models/components/benefitmetercreditupdate.js";
-import { PAAC_METADATA_KEY } from "../../core/metadata.js";
+import { PAC_METADATA_KEY } from "../../core/metadata.js";
 import type { Resolvable } from "../ref.js";
 
 export type BenefitOperationMetadata = Readonly<Record<string, string | number | boolean>> & {
-  readonly [PAAC_METADATA_KEY]: string;
+  readonly [PAC_METADATA_KEY]: string;
 };
 
 export type BenefitMeterCreditPropertiesOperationPayload = Omit<

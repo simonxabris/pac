@@ -31,12 +31,12 @@ readonly execute: (operations: ReadonlyArray<Operation>) => Effect.Effect<void>
 Supported action tags:
 
 ```ts
-CreateMeter
-UpdateMeter
-ArchiveMeter
-CreateProduct
-UpdateProduct
-ArchiveProduct
+CreateMeter;
+UpdateMeter;
+ArchiveMeter;
+CreateProduct;
+UpdateProduct;
+ArchiveProduct;
 ```
 
 Payloads are Polar-shaped operation payloads produced by resource adapters.
@@ -141,7 +141,7 @@ When an operation is about to execute, its action/payload is traversed and a new
 Implement generic recursive resolution:
 
 ```ts
-resolveRefs(value, bindings)
+resolveRefs(value, bindings);
 ```
 
 Rules:
@@ -193,7 +193,7 @@ and rollback should start for already-successful operations.
 For now refs only support:
 
 ```ts
-field: "polarId"
+field: "polarId";
 ```
 
 Important nuance: bindings are not “all refs”. Bindings are known resource outputs:
@@ -206,7 +206,7 @@ Currently that means:
 
 ```ts
 {
-  polarId: "..."
+  polarId: "...";
 }
 ```
 
@@ -236,18 +236,20 @@ The executor should resolve those into a separate internal resolved action type 
 Conceptually:
 
 ```ts
-OperationAction          // ref-aware operation AST
-ResolvedOperationAction  // no refs, safe to pass to PolarClient
+OperationAction; // ref-aware operation AST
+ResolvedOperationAction; // no refs, safe to pass to PolarClient
 ```
 
 A useful type-level model is a recursive `DeepResolved<T>`:
 
 ```ts
-type DeepResolved<T> =
-  T extends OperationRef ? string :
-  T extends ReadonlyArray<infer A> ? ReadonlyArray<DeepResolved<A>> :
-  T extends object ? { readonly [K in keyof T]: DeepResolved<T[K]> } :
-  T;
+type DeepResolved<T> = T extends OperationRef
+  ? string
+  : T extends ReadonlyArray<infer A>
+    ? ReadonlyArray<DeepResolved<A>>
+    : T extends object
+      ? { readonly [K in keyof T]: DeepResolved<T[K]> }
+      : T;
 ```
 
 Then:
@@ -304,16 +306,14 @@ const resolveRefs = <A>(
 Executor flow:
 
 ```ts
-const resolvedAction = yield* resolveRefs(operation.action, bindings);
-yield* executeResolvedAction(resolvedAction);
+const resolvedAction = yield * resolveRefs(operation.action, bindings);
+yield * executeResolvedAction(resolvedAction);
 ```
 
 `executeResolvedAction` should only accept fully resolved actions:
 
 ```ts
-const executeResolvedAction = (
-  action: ResolvedOperationAction,
-) => {
+const executeResolvedAction = (action: ResolvedOperationAction) => {
   switch (action._tag) {
     case "CreateProduct":
       return polar.createProduct(action.payload);
@@ -368,7 +368,7 @@ switch (action._tag) {
 
   case "ArchiveProduct":
     return polar.updateProduct(action.id, action.payload);
-    // or polar.archiveProduct(action.id)
+  // or polar.archiveProduct(action.id)
 
   case "CreateMeter":
     return polar.createMeter(action.payload);
@@ -378,7 +378,7 @@ switch (action._tag) {
 
   case "ArchiveMeter":
     return polar.updateMeter(action.id, action.payload);
-    // or polar.archiveMeter(action.id)
+  // or polar.archiveMeter(action.id)
 }
 ```
 
@@ -393,18 +393,20 @@ Why centralized dispatch is preferred:
 Current `PolarClient` exposes:
 
 ```ts
-createMeter(payload)
-updateMeter(id, payload)
-archiveMeter(id)
-createProduct(payload)
-updateProduct(id, payload)
-archiveProduct(id)
+createMeter(payload);
+updateMeter(id, payload);
+archiveMeter(id);
+createProduct(payload);
+updateProduct(id, payload);
+archiveProduct(id);
 ```
 
 Archive operation payloads currently look like:
 
 ```ts
-{ isArchived: true }
+{
+  isArchived: true;
+}
 ```
 
 But `PolarClient.archive*` already encodes that internally. We can choose either:
@@ -416,7 +418,7 @@ Prefer option 2 if we want the operation payload to fully describe what gets sen
 
 Decision still open.
 
-If PAAC later supports multiple providers, we may introduce a provider-specific action executor registry. But this should still be separate from resource adapters.
+If PAC later supports multiple providers, we may introduce a provider-specific action executor registry. But this should still be separate from resource adapters.
 
 ## Rollback / compensation
 
@@ -480,7 +482,7 @@ type CompletedOperation = {
 But the first pass can store just:
 
 ```ts
-Array<OperationAction>
+Array<OperationAction>;
 ```
 
 Important: rollback actions may also contain refs, such as archiving a just-created resource:
@@ -506,9 +508,9 @@ Use tagged errors.
 Likely errors:
 
 ```ts
-ExecutorRefResolutionError
-ExecutorActionError
-ExecutorRollbackError
+ExecutorRefResolutionError;
+ExecutorActionError;
+ExecutorRollbackError;
 ```
 
 Potential shape:

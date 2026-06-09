@@ -1,4 +1,4 @@
-import { Product, fixedPrice } from "paac";
+import { Product, fixedPrice } from "pac";
 
 export const updated = new Product("update-mutable", {
   name: "E2E Mutable Product V1",

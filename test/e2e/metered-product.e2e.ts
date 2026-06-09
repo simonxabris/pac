@@ -3,7 +3,7 @@ import type { Product as RemoteProduct } from "@polar-sh/sdk/models/components/p
 import { describe, expect, it } from "vitest";
 import { deployConfig } from "./helpers/deploy.js";
 import { e2eOrganizationFromEnv } from "./helpers/env.js";
-import { findMeterByKey, findProductByKey, paacMetadata } from "./helpers/polar.js";
+import { findMeterByKey, findProductByKey, pacMetadata } from "./helpers/polar.js";
 
 type RemoteProductPrice = RemoteProduct["prices"][number];
 
@@ -45,7 +45,7 @@ describe("metered Product e2e", () => {
       await findMeterByKey(org, "metered-product-requests"),
       "metered-product-requests",
     );
-    expect(meterV1.metadata.paac).toBe(paacMetadata("meter", "metered-product-requests"));
+    expect(meterV1.metadata.pac).toBe(pacMetadata("meter", "metered-product-requests"));
     expect(meterV1.archivedAt ?? null).toBeNull();
     expect(meterV1).toMatchObject({
       name: "E2E Metered Product Requests V1",
@@ -66,7 +66,7 @@ describe("metered Product e2e", () => {
       await findProductByKey(org, "metered-product-pro"),
       "metered-product-pro",
     );
-    expect(productV1.metadata.paac).toBe(paacMetadata("product", "metered-product-pro"));
+    expect(productV1.metadata.pac).toBe(pacMetadata("product", "metered-product-pro"));
     expect(productV1).toMatchObject({
       name: "E2E Metered Product Pro",
       description: "Fixed monthly fee plus metered request usage",

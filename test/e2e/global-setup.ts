@@ -20,7 +20,11 @@ const bootstrapE2EOrganization = async (): Promise<void> =>
         return;
       }
 
-      reject(new Error(`E2E Polar bootstrap failed with code ${code ?? "null"} signal ${signal ?? "null"}`));
+      reject(
+        new Error(
+          `E2E Polar bootstrap failed with code ${code ?? "null"} signal ${signal ?? "null"}`,
+        ),
+      );
     });
   });
 

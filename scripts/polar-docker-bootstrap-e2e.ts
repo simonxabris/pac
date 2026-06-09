@@ -3,16 +3,16 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
-const polarRoot = process.env.PAAC_E2E_POLAR_ROOT ?? "/Users/abrissimon/projects/polar";
-const instance = Number(process.env.PAAC_E2E_POLAR_DOCKER_INSTANCE ?? "1");
-const apiUrl = process.env.PAAC_E2E_POLAR_API_URL ?? `http://localhost:${8100 + instance}`;
-const polarSecret = process.env.PAAC_E2E_POLAR_SECRET ?? "super secret jwt secret";
+const polarRoot = process.env.PAC_E2E_POLAR_ROOT ?? "/Users/abrissimon/projects/polar";
+const instance = Number(process.env.PAC_E2E_POLAR_DOCKER_INSTANCE ?? "1");
+const apiUrl = process.env.PAC_E2E_POLAR_API_URL ?? `http://localhost:${8100 + instance}`;
+const polarSecret = process.env.PAC_E2E_POLAR_SECRET ?? "super secret jwt secret";
 const outputPath = resolve(process.cwd(), ".polar-e2e/current-org.json");
 
 const token = `polar_oat_${randomBytes(32).toString("base64url")}`;
 const tokenHash = createHmac("sha256", polarSecret).update(token).digest("hex");
 const suffix = `${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
-const slug = `paac-e2e-${suffix}`;
+const slug = `pac-e2e-${suffix}`;
 
 const python = String.raw`
 import asyncio
@@ -30,12 +30,12 @@ from polar.models.organization import OrganizationStatus, STATUS_CAPABILITIES
 from polar.models.user_organization import OrganizationRole
 
 async def main():
-    org_id = uuid.UUID(os.environ["PAAC_E2E_ORG_ID"])
-    account_id = uuid.UUID(os.environ["PAAC_E2E_ACCOUNT_ID"])
-    token_id = uuid.UUID(os.environ["PAAC_E2E_TOKEN_ID"])
-    slug = os.environ["PAAC_E2E_ORG_SLUG"]
-    token_hash = os.environ["PAAC_E2E_TOKEN_HASH"]
-    user_email = os.environ.get("PAAC_E2E_USER_EMAIL", "admin@polar.sh")
+    org_id = uuid.UUID(os.environ["PAC_E2E_ORG_ID"])
+    account_id = uuid.UUID(os.environ["PAC_E2E_ACCOUNT_ID"])
+    token_id = uuid.UUID(os.environ["PAC_E2E_TOKEN_ID"])
+    slug = os.environ["PAC_E2E_ORG_SLUG"]
+    token_hash = os.environ["PAC_E2E_TOKEN_HASH"]
+    user_email = os.environ.get("PAC_E2E_USER_EMAIL", "admin@polar.sh")
 
     engine = create_async_engine("script")
     sessionmaker = create_async_sessionmaker(engine)
@@ -43,7 +43,7 @@ async def main():
         account = Account(id=account_id, currency="usd")
         organization = Organization(
             id=org_id,
-            name=f"PAAC E2E {slug}",
+            name=f"PAC E2E {slug}",
             slug=slug,
             email=f"{slug}@polar.local",
             customer_invoice_prefix=slug.upper()[:32],
@@ -61,7 +61,7 @@ async def main():
             id=token_id,
             organization=organization,
             token=token_hash,
-            comment="PAAC E2E",
+            comment="PAC E2E",
             scope=" ".join([
                 "organizations:read",
                 "organizations:write",
@@ -92,7 +92,11 @@ async def main():
 asyncio.run(main())
 `;
 
-const run = async (command: string, args: ReadonlyArray<string>, env: NodeJS.ProcessEnv): Promise<string> =>
+const run = async (
+  command: string,
+  args: ReadonlyArray<string>,
+  env: NodeJS.ProcessEnv,
+): Promise<string> =>
   new Promise((resolveRun, reject) => {
     const child = spawn(command, args, { cwd: polarRoot, env, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
@@ -104,7 +108,12 @@ const run = async (command: string, args: ReadonlyArray<string>, env: NodeJS.Pro
     child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) resolveRun(stdout);
-      else reject(new Error(`${command} ${args.join(" ")} failed with ${code}\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`));
+      else
+        reject(
+          new Error(
+            `${command} ${args.join(" ")} failed with ${code}\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`,
+          ),
+        );
     });
     child.stdin.end(python);
   });
@@ -112,12 +121,12 @@ const run = async (command: string, args: ReadonlyArray<string>, env: NodeJS.Pro
 const main = async () => {
   const env = {
     ...process.env,
-    PAAC_E2E_ORG_ID: randomUUID(),
-    PAAC_E2E_ACCOUNT_ID: randomUUID(),
-    PAAC_E2E_TOKEN_ID: randomUUID(),
-    PAAC_E2E_ORG_SLUG: slug,
-    PAAC_E2E_TOKEN_HASH: tokenHash,
-    PAAC_E2E_USER_EMAIL: process.env.PAAC_E2E_USER_EMAIL ?? "admin@polar.sh",
+    PAC_E2E_ORG_ID: randomUUID(),
+    PAC_E2E_ACCOUNT_ID: randomUUID(),
+    PAC_E2E_TOKEN_ID: randomUUID(),
+    PAC_E2E_ORG_SLUG: slug,
+    PAC_E2E_TOKEN_HASH: tokenHash,
+    PAC_E2E_USER_EMAIL: process.env.PAC_E2E_USER_EMAIL ?? "admin@polar.sh",
   };
 
   const stdout = await run(
@@ -131,17 +140,17 @@ const main = async () => {
       "exec",
       "-T",
       "-e",
-      "PAAC_E2E_ORG_ID",
+      "PAC_E2E_ORG_ID",
       "-e",
-      "PAAC_E2E_ACCOUNT_ID",
+      "PAC_E2E_ACCOUNT_ID",
       "-e",
-      "PAAC_E2E_TOKEN_ID",
+      "PAC_E2E_TOKEN_ID",
       "-e",
-      "PAAC_E2E_ORG_SLUG",
+      "PAC_E2E_ORG_SLUG",
       "-e",
-      "PAAC_E2E_TOKEN_HASH",
+      "PAC_E2E_TOKEN_HASH",
       "-e",
-      "PAAC_E2E_USER_EMAIL",
+      "PAC_E2E_USER_EMAIL",
       "api",
       "bash",
       "-lc",
