@@ -3,12 +3,15 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { AsyncEntry } from "@napi-rs/keyring";
+import { Polar } from "@polar-sh/sdk";
+import type { Organization } from "@polar-sh/sdk/models/components/organization.js";
 import type { TokenResponse } from "@polar-sh/sdk/models/components/tokenresponse.js";
 import { Schema } from "effect";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
+import * as Prompt from "effect/unstable/cli/Prompt";
 
 export type PolarEnvironment = "production" | "sandbox";
 
@@ -22,6 +25,14 @@ export type KeysToSnakeCase<T> = {
 
 export const TokenScope = Schema.Array(Schema.String);
 
+export const LoggedInUser = Schema.Struct({
+  id: Schema.String,
+  name: Schema.NullOr(Schema.String),
+  email: Schema.NullOr(Schema.String),
+  emailVerified: Schema.NullOr(Schema.Boolean),
+});
+export type LoggedInUser = Schema.Schema.Type<typeof LoggedInUser>;
+
 export const Token = Schema.Struct({
   token: Schema.RedactedFromValue(Schema.String),
   refreshToken: Schema.optionalKey(Schema.RedactedFromValue(Schema.String)),
@@ -29,6 +40,7 @@ export const Token = Schema.Struct({
   expiresAt: Schema.DateFromString,
   scope: TokenScope,
   server: Schema.Union([Schema.Literal("production"), Schema.Literal("sandbox")]),
+  user: Schema.optionalKey(LoggedInUser),
 });
 
 export type Token = Schema.Schema.Type<typeof Token>;
@@ -39,6 +51,14 @@ export const Tokens = Schema.Struct({
 });
 export type Tokens = Schema.Schema.Type<typeof Tokens>;
 
+export const SelectedOrganization = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  slug: Schema.String,
+  server: Schema.Union([Schema.Literal("production"), Schema.Literal("sandbox")]),
+});
+export type SelectedOrganization = Schema.Schema.Type<typeof SelectedOrganization>;
+
 export type OAuthShape = {
   readonly login: (server: PolarEnvironment) => Effect.Effect<Token, OAuthError>;
   readonly logout: () => Effect.Effect<void, OAuthError>;
@@ -46,6 +66,18 @@ export type OAuthShape = {
   readonly isAuthenticated: (server: PolarEnvironment) => Effect.Effect<boolean, OAuthError>;
   readonly getAccessToken: (server: PolarEnvironment) => Effect.Effect<Token, OAuthError>;
   readonly resolveAccessToken: (server: PolarEnvironment) => Effect.Effect<Token, OAuthError>;
+  readonly listOrganizations: (
+    server: PolarEnvironment,
+  ) => Effect.Effect<ReadonlyArray<SelectedOrganization>, OAuthError>;
+  readonly getSelectedOrganization: (
+    server: PolarEnvironment,
+  ) => Effect.Effect<SelectedOrganization | undefined, OAuthError>;
+  readonly selectOrganization: (
+    server: PolarEnvironment,
+  ) => Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment>;
+  readonly resolveSelectedOrganization: (
+    server: PolarEnvironment,
+  ) => Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment>;
 };
 
 export class OAuthError extends Schema.TaggedErrorClass<OAuthError>()("OAuthError", {
@@ -62,7 +94,8 @@ const PRODUCTION_AUTHORIZATION_URL = "https://polar.sh/oauth2/authorize";
 const SANDBOX_TOKEN_URL = "https://sandbox-api.polar.sh/v1/oauth2/token";
 const PRODUCTION_TOKEN_URL = "https://api.polar.sh/v1/oauth2/token";
 
-const KEYRING_SERVICE = "paac.polar.oauth";
+const TOKEN_KEYRING_SERVICE = "paac.polar.oauth";
+const SELECTED_ORGANIZATION_KEYRING_SERVICE = "paac.polar.selected-organization";
 
 const config = {
   scopes: [
@@ -132,12 +165,16 @@ const config = {
   redirectUrl: "http://127.0.0.1:3333/oauth/callback",
 };
 
-const keyringEntry = (server: PolarEnvironment) => new AsyncEntry(KEYRING_SERVICE, server);
+const tokenEntry = (environment: PolarEnvironment) =>
+  new AsyncEntry(TOKEN_KEYRING_SERVICE, environment);
+
+const selectedOrganizationEntry = (environment: PolarEnvironment) =>
+  new AsyncEntry(SELECTED_ORGANIZATION_KEYRING_SERVICE, environment);
 
 const readToken = (server: PolarEnvironment): Effect.Effect<Token | undefined, OAuthError> =>
   Effect.gen(function*() {
     const raw = yield* Effect.tryPromise({
-      try: () => keyringEntry(server).getPassword(),
+      try: () => tokenEntry(server).getPassword(),
       catch: (cause) => new OAuthError({ message: "Failed to read token from keyring", cause }),
     });
 
@@ -171,13 +208,11 @@ const readTokens: Effect.Effect<Tokens, OAuthError> = Effect.gen(function*() {
 const saveToken = (token: Token): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
     const encoded = yield* Schema.encodeUnknownEffect(Token)(token).pipe(
-      Effect.mapError(
-        (cause) => new OAuthError({ message: "Failed to encode token", cause }),
-      ),
+      Effect.mapError((cause) => new OAuthError({ message: "Failed to encode token", cause })),
     );
 
     yield* Effect.tryPromise({
-      try: () => keyringEntry(token.server).setPassword(JSON.stringify(encoded)),
+      try: () => tokenEntry(token.server).setPassword(JSON.stringify(encoded)),
       catch: (cause) => new OAuthError({ message: "Failed to save token to keyring", cause }),
     });
 
@@ -187,15 +222,79 @@ const saveToken = (token: Token): Effect.Effect<Token, OAuthError> =>
 const deleteToken = (server: PolarEnvironment): Effect.Effect<void, OAuthError> =>
   Effect.tryPromise({
     try: async () => {
-      await keyringEntry(server).deleteCredential();
+      await tokenEntry(server).deleteCredential();
     },
     catch: (cause) => new OAuthError({ message: "Failed to delete token from keyring", cause }),
   }).pipe(Effect.catch(() => Effect.void));
 
+const getSelectedOrganization = (
+  server: PolarEnvironment,
+): Effect.Effect<SelectedOrganization | undefined, OAuthError> =>
+  Effect.gen(function*() {
+    const raw = yield* Effect.tryPromise({
+      try: () => selectedOrganizationEntry(server).getPassword(),
+      catch: (cause) =>
+        new OAuthError({ message: "Failed to read selected organization from keyring", cause }),
+    });
+
+    if (!raw) return undefined;
+
+    const parsed = yield* Effect.try({
+      try: () => JSON.parse(raw) as unknown,
+      catch: (cause) =>
+        new OAuthError({ message: "Failed to parse selected organization from keyring", cause }),
+    });
+
+    return yield* Schema.decodeUnknownEffect(SelectedOrganization)(parsed).pipe(
+      Effect.mapError(
+        (cause) =>
+          new OAuthError({
+            message: "Failed to decode selected organization from keyring",
+            cause,
+          }),
+      ),
+    );
+  });
+
+const saveSelectedOrganization = (
+  organization: SelectedOrganization,
+): Effect.Effect<SelectedOrganization, OAuthError> =>
+  Effect.gen(function*() {
+    const encoded = yield* Schema.encodeUnknownEffect(SelectedOrganization)(organization).pipe(
+      Effect.mapError(
+        (cause) => new OAuthError({ message: "Failed to encode selected organization", cause }),
+      ),
+    );
+
+    yield* Effect.tryPromise({
+      try: () =>
+        selectedOrganizationEntry(organization.server).setPassword(JSON.stringify(encoded)),
+      catch: (cause) =>
+        new OAuthError({ message: "Failed to save selected organization to keyring", cause }),
+    });
+
+    return organization;
+  });
+
+const deleteSelectedOrganization = (server: PolarEnvironment): Effect.Effect<void, OAuthError> =>
+  Effect.tryPromise({
+    try: async () => {
+      await selectedOrganizationEntry(server).deleteCredential();
+    },
+    catch: (cause) =>
+      new OAuthError({ message: "Failed to delete selected organization from keyring", cause }),
+  }).pipe(Effect.catch(() => Effect.void));
+
 const logout = (): Effect.Effect<void, OAuthError> =>
-  Effect.all([deleteToken("production"), deleteToken("sandbox")], {
-    concurrency: "unbounded",
-  }).pipe(Effect.asVoid);
+  Effect.all(
+    [
+      deleteToken("production"),
+      deleteToken("sandbox"),
+      deleteSelectedOrganization("production"),
+      deleteSelectedOrganization("sandbox"),
+    ],
+    { concurrency: "unbounded" },
+  ).pipe(Effect.asVoid);
 
 const getAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
@@ -215,13 +314,14 @@ const getAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthErr
 const login = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
     const token = yield* captureAccessTokenFromHTTPServer(server);
-    return yield* saveToken(token);
+    const user = yield* fetchLoggedInUser(server, token);
+    return yield* saveToken({ ...token, user });
   });
 
 const refresh = (token: Token): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
     const refreshedToken = yield* refreshAccessToken(token);
-    return yield* saveToken(refreshedToken);
+    return yield* saveToken(token.user ? { ...refreshedToken, user: token.user } : refreshedToken);
   });
 
 const isAuthenticated = (server: PolarEnvironment): Effect.Effect<boolean, OAuthError> =>
@@ -234,6 +334,113 @@ const resolveAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAut
   Effect.gen(function*() {
     const authenticated = yield* isAuthenticated(server);
     return yield* authenticated ? getAccessToken(server) : login(server);
+  });
+
+const fetchLoggedInUser = (
+  server: PolarEnvironment,
+  token: Token,
+): Effect.Effect<LoggedInUser, OAuthError> =>
+  Effect.gen(function*() {
+    const sdk = createPolarClient(server, token);
+    const userinfo = yield* Effect.tryPromise({
+      try: () => sdk.oauth2.userinfo(),
+      catch: (cause) => new OAuthError({ message: "Failed to fetch logged in user", cause }),
+    });
+
+    return LoggedInUser.make({
+      id: userinfo.sub,
+      name: userinfo.name ?? null,
+      email: "email" in userinfo ? (userinfo.email ?? null) : null,
+      emailVerified: "emailVerified" in userinfo ? (userinfo.emailVerified ?? null) : null,
+    });
+  });
+
+const selectedOrganizationFromPolarOrganization = (
+  server: PolarEnvironment,
+  organization: Organization,
+): SelectedOrganization =>
+  SelectedOrganization.make({
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    server,
+  });
+
+const createPolarClient = (server: PolarEnvironment, token: Token): Polar =>
+  new Polar({
+    accessToken: Redacted.value(token.token),
+    server,
+  });
+
+const listOrganizations = (
+  server: PolarEnvironment,
+): Effect.Effect<ReadonlyArray<SelectedOrganization>, OAuthError> =>
+  Effect.gen(function*() {
+    const token = yield* resolveAccessToken(server);
+    const sdk = createPolarClient(server, token);
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const iterator = await sdk.organizations.list({ limit: 100 });
+        const organizations: Array<SelectedOrganization> = [];
+
+        for await (const page of iterator) {
+          organizations.push(
+            ...page.result.items.map((organization) =>
+              selectedOrganizationFromPolarOrganization(server, organization),
+            ),
+          );
+        }
+
+        return organizations;
+      },
+      catch: (cause) => new OAuthError({ message: "Failed to list Polar organizations", cause }),
+    });
+  });
+
+const selectOrganization = (
+  server: PolarEnvironment,
+): Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment> =>
+  Effect.gen(function*() {
+    const organizations = yield* listOrganizations(server);
+
+    if (organizations.length === 0) {
+      return yield* new OAuthError({
+        message: "No Polar organizations found for the authenticated user",
+        cause: undefined,
+      });
+    }
+
+    const current = yield* getSelectedOrganization(server);
+    const selected = yield* Prompt.run(
+      Prompt.select({
+        message: "Select Polar organization",
+        choices: organizations.map((organization) => ({
+          title: organization.name,
+          value: organization,
+          description: `${organization.slug} (${organization.id})`,
+          selected: organization.id === current?.id,
+        })),
+      }),
+    ).pipe(
+      Effect.mapError(
+        (cause) =>
+          new OAuthError({
+            message: "Organization selection was cancelled",
+            cause,
+          }),
+      ),
+    );
+
+    return yield* saveSelectedOrganization(selected);
+  });
+
+const resolveSelectedOrganization = (
+  server: PolarEnvironment,
+): Effect.Effect<SelectedOrganization, OAuthError, Prompt.Environment> =>
+  Effect.gen(function*() {
+    const organization = yield* getSelectedOrganization(server);
+    return yield* organization ? Effect.succeed(organization) : selectOrganization(server);
   });
 
 const captureAccessTokenFromHTTPServer = (
@@ -285,9 +492,7 @@ const captureAccessTokenFromHTTPServer = (
         if (completed) return;
         completed = true;
         closeServer();
-        resume(
-          Effect.fail(new OAuthError({ message: "Temporary HTTP server failed", cause })),
-        );
+        resume(Effect.fail(new OAuthError({ message: "Temporary HTTP server failed", cause })));
       });
 
       signal.addEventListener("abort", closeServer, { once: true });
@@ -485,6 +690,10 @@ export class OAuth extends Context.Service<OAuth, OAuthShape>()("@paac/OAuth") {
       isAuthenticated,
       getAccessToken,
       resolveAccessToken,
+      listOrganizations,
+      getSelectedOrganization,
+      selectOrganization,
+      resolveSelectedOrganization,
     }),
   );
 }

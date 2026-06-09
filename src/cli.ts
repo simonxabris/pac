@@ -11,6 +11,7 @@ import { importCommand, ImportCommand } from "./commands/import.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
 import { planCommand } from "./commands/plan.js";
+import { whoamiCommand } from "./commands/whoami.js";
 import { ConfigLoader } from "./services/config-loader.js";
 import { AppConfig } from "./services/app-config.js";
 import { Executor } from "./services/executor.js";
@@ -57,6 +58,7 @@ const cli = Command.make("paac").pipe(
     importCommand,
     loginCommand,
     logoutCommand,
+    whoamiCommand,
   ]),
 );
 
