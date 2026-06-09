@@ -6,7 +6,7 @@ import { AsyncEntry } from "@napi-rs/keyring";
 import { Polar } from "@polar-sh/sdk";
 import type { Organization } from "@polar-sh/sdk/models/components/organization.js";
 import type { TokenResponse } from "@polar-sh/sdk/models/components/tokenresponse.js";
-import { Schema } from "effect";
+import { Console, Schema } from "effect";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -332,8 +332,17 @@ const isAuthenticated = (server: PolarEnvironment): Effect.Effect<boolean, OAuth
 
 const resolveAccessToken = (server: PolarEnvironment): Effect.Effect<Token, OAuthError> =>
   Effect.gen(function*() {
-    const authenticated = yield* isAuthenticated(server);
-    return yield* authenticated ? getAccessToken(server) : login(server);
+    const token = yield* readToken(server);
+
+    if (!token) {
+      return yield* login(server);
+    }
+
+    if (token.expiresAt > new Date()) {
+      return token;
+    }
+
+    return yield* refresh(token).pipe(Effect.catch(() => login(server)));
   });
 
 const fetchLoggedInUser = (
