@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import packageJson from "../package.json" with { type: "json" };
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Layer } from "effect";
@@ -67,7 +68,7 @@ const cli = Command.make("pac").pipe(
   Command.provide(({ env }) => Layer.mergeAll(AppConfig.layerWithCliEnv(env), OAuth.layer)),
 );
 
-Command.run(cli, { version: "1.0.0" }).pipe(
+Command.run(cli, { version: packageJson.version }).pipe(
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,
 );
