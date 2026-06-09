@@ -15,6 +15,9 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "node --import tsx src/cli.ts",
     "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
