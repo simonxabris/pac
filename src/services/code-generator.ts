@@ -11,6 +11,7 @@ import type { CurrentResource } from "../core/resource.js";
 import type { ImportModel } from "../import/project.js";
 import type { Plan } from "./planner.js";
 import type { BenefitSpec } from "../resources/benefit.js";
+import type { EventDefinition, EventMetadataField } from "../events/event.js";
 import type {
   MeterAggregationSpec,
   MeterFilterClauseSpec,
@@ -232,6 +233,154 @@ const renderExport = (
 
     return [`export const ${name} = {`, ...entries, `} as const;`].join("\n");
   });
+
+const toPascalCase = (value: string): string => {
+  const words = value.match(/[A-Za-z0-9]+/g) ?? [];
+  const rendered = words
+    .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`)
+    .join("");
+
+  if (rendered.length === 0) return "Pac";
+  return /^[A-Za-z_$]/.test(rendered) ? rendered : `Event${rendered}`;
+};
+
+const eventClassBaseName = (definition: EventDefinition): string => {
+  const baseName = toPascalCase(definition.name || definition.key);
+  return baseName.endsWith("Event") ? baseName : `${baseName}Event`;
+};
+
+const eventRuntimeNames = (
+  definitions: ReadonlyArray<EventDefinition>,
+): ReadonlyArray<readonly [EventDefinition, string]> => {
+  const used = new Map<string, number>();
+
+  return definitions.map((definition) => {
+    const baseName = eventClassBaseName(definition);
+    const count = used.get(baseName) ?? 0;
+    used.set(baseName, count + 1);
+    return [definition, count === 0 ? baseName : `${baseName}${count + 1}`] as const;
+  });
+};
+
+const eventFieldTsType = (field: EventMetadataField): string => {
+  switch (field.valueType) {
+    case "string":
+      return "string";
+    case "number":
+      return "number";
+    case "boolean":
+      return "boolean";
+    case "unknown":
+      return "EventMetadataInput";
+  }
+};
+
+const renderEventMetadataType = (
+  className: string,
+  fields: ReadonlyArray<EventMetadataField>,
+): string => {
+  const typeName = `${className}Metadata`;
+  if (fields.length === 0) return `export type ${typeName} = Record<never, never>;`;
+
+  return [
+    `export type ${typeName} = {`,
+    ...fields.map((field) => {
+      const optional = field.optional ? "?" : "";
+      const undefinedType = field.optional ? " | undefined" : "";
+      return `  ${renderPropertyKey(field.key)}${optional}: ${eventFieldTsType(field)}${undefinedType};`;
+    }),
+    `};`,
+  ].join("\n");
+};
+
+const renderEventInputType = (className: string): string =>
+  [
+    `export type ${className}Input = {`,
+    `  timestamp?: Date | undefined;`,
+    `  organizationId?: string | null | undefined;`,
+    `  externalId?: string | null | undefined;`,
+    `  parentId?: string | null | undefined;`,
+    `  metadata: ${className}Metadata;`,
+    `} & (`,
+    `  | {`,
+    `      customerId: string;`,
+    `      memberId?: string | null | undefined;`,
+    `      externalCustomerId?: never;`,
+    `      externalMemberId?: never;`,
+    `    }`,
+    `  | {`,
+    `      externalCustomerId: string;`,
+    `      externalMemberId?: string | null | undefined;`,
+    `      customerId?: never;`,
+    `      memberId?: never;`,
+    `    }`,
+    `);`,
+  ].join("\n");
+
+const renderRuntimeEvent = (definition: EventDefinition, className: string): string => {
+  const toPolarName = `toPolar${className}`;
+
+  return [
+    renderEventMetadataType(className, definition.fields),
+    "",
+    renderEventInputType(className),
+    "",
+    `const ${toPolarName} = (input: ${className}Input): Events => {`,
+    `  const { timestamp, organizationId, externalId, parentId } = input;`,
+    `  const metadata = omitUndefined(input.metadata);`,
+    "",
+    `  if (input.customerId !== undefined) {`,
+    `    return {`,
+    `      timestamp,`,
+    `      organizationId,`,
+    `      externalId,`,
+    `      parentId,`,
+    `      customerId: input.customerId,`,
+    `      memberId: input.memberId,`,
+    `      name: ${JSON.stringify(definition.name)},`,
+    `      metadata,`,
+    `    };`,
+    `  }`,
+    "",
+    `  return {`,
+    `    timestamp,`,
+    `    organizationId,`,
+    `    externalId,`,
+    `    parentId,`,
+    `    externalCustomerId: input.externalCustomerId,`,
+    `    externalMemberId: input.externalMemberId,`,
+    `    name: ${JSON.stringify(definition.name)},`,
+    `    metadata,`,
+    `  };`,
+    `};`,
+    "",
+    `export class ${className} {`,
+    `  declare readonly timestamp: Date | undefined;`,
+    `  declare readonly name: string;`,
+    `  declare readonly organizationId: string | null | undefined;`,
+    `  declare readonly externalId: string | null | undefined;`,
+    `  declare readonly parentId: string | null | undefined;`,
+    `  declare readonly metadata: DefinedRecord<${className}Metadata>;`,
+    `  declare readonly customerId: string;`,
+    `  declare readonly memberId: string | null | undefined;`,
+    `  declare readonly externalCustomerId: string;`,
+    `  declare readonly externalMemberId: string | null | undefined;`,
+    "",
+    `  constructor(input: ${className}Input) {`,
+    `    Object.assign(this, ${toPolarName}(input));`,
+    `  }`,
+    `}`,
+  ].join("\n");
+};
+
+const renderRuntimeEvents = (definitions: ReadonlyArray<EventDefinition>): string => {
+  if (definitions.length === 0) return "";
+
+  const entries = eventRuntimeNames(definitions);
+  return entries
+    .map(([definition, className]) => renderRuntimeEvent(definition, className))
+    .join("\n\n");
+};
 
 type ImportSymbol =
   | "Benefit"
@@ -584,7 +733,10 @@ const assertRenderableResources = (
     return Effect.void;
   }).pipe(Effect.asVoid);
 
-const generateRuntime = (plan: Plan): Effect.Effect<string, CodeGenerationError> =>
+const generateRuntime = (
+  plan: Plan,
+  eventDefinitions: ReadonlyArray<EventDefinition> = [],
+): Effect.Effect<string, CodeGenerationError> =>
   Effect.gen(function* () {
     const resources = currentResourcesForGeneration(plan);
     yield* assertRenderableResources(resources);
@@ -602,18 +754,50 @@ const generateRuntime = (plan: Plan): Effect.Effect<string, CodeGenerationError>
     const exports = yield* Effect.forEach(["product", "meter", "benefit"] as const, (kind) =>
       renderExport(exportNameByKind[kind], grouped[kind]),
     );
+    const eventExports = renderRuntimeEvents(eventDefinitions);
+    const hasUnknownEventFields = eventDefinitions.some((definition) =>
+      definition.fields.some((field) => field.valueType === "unknown"),
+    );
+
+    const prelude = ["// This file is generated by PAC. Do not edit manually."];
+
+    if (eventDefinitions.length > 0) {
+      prelude.push(
+        `import type { Events } from "@polar-sh/sdk/models/components/eventsingest.js";`,
+      );
+    }
+
+    if (hasUnknownEventFields) {
+      prelude.push(
+        `import type { EventMetadataInput } from "@polar-sh/sdk/models/components/eventmetadatainput.js";`,
+      );
+    }
+
+    const eventHelpers =
+      eventDefinitions.length > 0
+        ? [
+            `type DefinedRecord<T extends object> = Partial<{ [Key in keyof T]: Exclude<T[Key], undefined> }>;`,
+            `const omitUndefined = <T extends object>(value: T): DefinedRecord<T> =>\n  Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as DefinedRecord<T>;`,
+            "",
+          ]
+        : [];
 
     return [
-      "// This file is generated by PAC. Do not edit manually.",
+      ...prelude,
       "",
+      ...eventHelpers,
       ...exports.flatMap((rendered) => [rendered, ""]),
+      ...(eventExports.length > 0 ? [eventExports, ""] : []),
     ].join("\n");
   });
 
 export class CodeGenerator extends Context.Service<
   CodeGenerator,
   {
-    readonly generateRuntime: (plan: Plan) => Effect.Effect<string, CodeGenerationError>;
+    readonly generateRuntime: (
+      plan: Plan,
+      eventDefinitions?: ReadonlyArray<EventDefinition>,
+    ) => Effect.Effect<string, CodeGenerationError>;
     readonly generateConfig: (model: ImportModel) => Effect.Effect<string, CodeGenerationError>;
   }
 >()("@app/CodeGenerator") {

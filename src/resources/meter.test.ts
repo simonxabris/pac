@@ -17,6 +17,7 @@ import {
   meterFilterSpec,
   meterAggregationSpec,
 } from "./meter.js";
+import { Event } from "../events/event.js";
 import { resetRegistry } from "./registry.js";
 
 describe("Meter", () => {
@@ -67,6 +68,31 @@ describe("Meter", () => {
       expect(meter.toDesiredResource().spec.aggregation).toEqual({
         func: "sum",
         property: "bytes",
+      });
+    });
+
+    it("creates a meter aggregation from an event metadata ref", () => {
+      const event = new Event("token-usage", {
+        name: "token-usage",
+        metadata: {
+          type: "object",
+          properties: { tokens: { type: "number" } },
+          required: ["tokens"],
+        },
+      });
+
+      const meter = new Meter("token-usage", {
+        name: "Token Usage",
+        filter: eventName(event),
+        aggregation: sum(event.metadata.tokens),
+      });
+
+      expect(meter.toDesiredResource().spec).toMatchObject({
+        filter: {
+          conjunction: "and",
+          clauses: [{ property: "name", operator: "eq", value: "token-usage" }],
+        },
+        aggregation: { func: "sum", property: "tokens" },
       });
     });
 
@@ -188,6 +214,15 @@ describe("Meter", () => {
       const clause = eventName("eq", "api_call");
 
       expect(clause).toEqual({ property: "name", operator: "eq", value: "api_call" });
+    });
+
+    it("eventName() accepts an Event contract", () => {
+      const event = new Event("token-usage", {
+        name: "token-usage",
+        metadata: { type: "object", properties: {} },
+      });
+
+      expect(eventName(event)).toEqual({ property: "name", operator: "eq", value: "token-usage" });
     });
 
     it("eventTimestamp() creates a filter clause with a string value", () => {
