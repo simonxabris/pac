@@ -153,7 +153,8 @@ export class ImportCommand extends Context.Service<
         model: ImportModel,
       ): Effect.Effect<void, ImportValidationError> =>
         Effect.gen(function* () {
-          const desiredResources = yield* configLoader.loadDesiredResources(filePath);
+          const loadedConfig = yield* configLoader.loadConfig(filePath);
+          const desiredResources = loadedConfig.desiredResources;
           const expectedByAddress = new Map(
             model.resources.map((resource) => [resource.desired.address, resource.desired]),
           );
@@ -211,10 +212,10 @@ export class ImportCommand extends Context.Service<
         filePath: string,
       ): Effect.Effect<void, ImportValidationError> =>
         Effect.gen(function* () {
-          const desiredResources = yield* configLoader.loadDesiredResources(filePath);
+          const loadedConfig = yield* configLoader.loadConfig(filePath);
           const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
           const plan = yield* planner.plan({
-            desiredResources,
+            desiredResources: loadedConfig.desiredResources,
             currentResources: [...currentResourcesByAddress.values()],
           });
           yield* planner.assertPlanUpToDate(plan);

@@ -23,6 +23,9 @@ importers:
       effect:
         specifier: 4.0.0-beta.76
         version: 4.0.0-beta.76
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@effect/language-service':
         specifier: ^0.86.2

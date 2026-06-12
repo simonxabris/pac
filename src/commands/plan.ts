@@ -9,14 +9,14 @@ import { configFlag } from "./options.js";
 export const planCommand = Command.make("plan", { config: configFlag }, ({ config }) =>
   Effect.gen(function* () {
     const configLoader = yield* ConfigLoader;
-    const desiredResources = yield* configLoader.loadDesiredResources(config);
+    const loadedConfig = yield* configLoader.loadConfig(config);
     const remoteResourceFetcher = yield* RemoteResourceFetcher;
     const planner = yield* Planner;
     const renderer = yield* Renderer;
 
     const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
     const plan = yield* planner.plan({
-      desiredResources,
+      desiredResources: loadedConfig.desiredResources,
       currentResources: [...currentResourcesByAddress.values()],
     });
 
