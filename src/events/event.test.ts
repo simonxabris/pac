@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Event } from "./event.js";
+import { Event, type EventMetadataJsonSchemaLike } from "./event.js";
 
 describe("Event", () => {
   it("exposes typed metadata refs from top-level JSON Schema properties", () => {
@@ -56,9 +56,10 @@ describe("Event", () => {
   });
 
   it("exposes generic metadata refs for schema keys PAC cannot interpret", () => {
+    const metadata: EventMetadataJsonSchemaLike = { type: "object", properties: {} };
     const event = new Event("token-usage", {
       name: "token-usage",
-      metadata: { type: "object", properties: {} },
+      metadata,
     });
 
     expect(event.metadata.someFutureField).toEqual({
