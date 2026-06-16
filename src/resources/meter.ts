@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { makeAddress, type ResourceAddress } from "../core/address.js";
 import type { CurrentResource, DesiredResource } from "../core/resource.js";
+import type { Event, EventMetadataRef, EventMetadataValueType } from "../events/event.js";
 import { registerResource } from "./registry.js";
 
 export type MeterKind = "meter";
@@ -22,6 +23,7 @@ export type MeterFilter = {
   readonly conjunction: MeterFilterConjunction;
   readonly clauses: ReadonlyArray<MeterFilterClause | MeterFilter>;
 };
+export type MeterFilterInput = MeterFilter | MeterFilterClause;
 
 export type CountAggregationFunction = "count";
 export type PropertyAggregationFunction = "sum" | "max" | "min" | "avg";
@@ -44,7 +46,7 @@ export type MeterConfig = {
   readonly unit?: "scalar" | "token" | "custom";
   readonly customLabel?: string | null;
   readonly customMultiplier?: number | null;
-  readonly filter: MeterFilter;
+  readonly filter: MeterFilterInput;
   readonly aggregation: MeterAggregation;
 };
 
@@ -142,10 +144,29 @@ export const where = (
   value: MeterFilterValue,
 ): MeterFilterClause => ({ property, operator, value });
 
-export const eventName = (
+export function eventName(event: Event<unknown>): MeterFilterClause;
+export function eventName(
   operator: MeterFilterOperator,
   value: MeterFilterValue,
-): MeterFilterClause => ({ property: "name", operator, value });
+): MeterFilterClause;
+export function eventName(
+  eventOrOperator: Event<unknown> | MeterFilterOperator,
+  value?: MeterFilterValue,
+): MeterFilterClause {
+  if (value === undefined) {
+    if (typeof eventOrOperator === "string") {
+      throw new TypeError("eventName(operator, value) requires a value.");
+    }
+
+    return { property: "name", operator: "eq", value: eventOrOperator.name };
+  }
+
+  if (typeof eventOrOperator !== "string") {
+    throw new TypeError("eventName(event) does not accept a second argument.");
+  }
+
+  return { property: "name", operator: eventOrOperator, value };
+}
 
 export const eventTimestamp = (
   operator: MeterFilterOperator,
@@ -172,37 +193,112 @@ export const or = (...clauses: ReadonlyArray<MeterFilterClause | MeterFilter>): 
   clauses,
 });
 
+export type AnyEventMetadataRef =
+  | EventMetadataRef<EventMetadataValueType>
+  | EventMetadataRef<"string">
+  | EventMetadataRef<"number">
+  | EventMetadataRef<"boolean">
+  | EventMetadataRef<"unknown">;
+export type MeterPropertyInput = string | AnyEventMetadataRef;
+export type NumericMeterPropertyInput =
+  | string
+  | EventMetadataRef<"number">
+  | EventMetadataRef<EventMetadataValueType>;
+export type UniqueMeterPropertyInput =
+  | string
+  | EventMetadataRef<"string">
+  | EventMetadataRef<"number">
+  | EventMetadataRef<"boolean">
+  | EventMetadataRef<EventMetadataValueType>;
+
+const isEventMetadataRef = (value: unknown): value is AnyEventMetadataRef =>
+  typeof value === "object" &&
+  value !== null &&
+  "meterPath" in value &&
+  typeof (value as { readonly meterPath?: unknown }).meterPath === "string";
+
+const aggregationPropertyPath = (property: MeterPropertyInput): string =>
+  isEventMetadataRef(property) ? property.key : property;
+
+const isMeterFilter = (filter: MeterFilterInput): filter is MeterFilter => "clauses" in filter;
+
 export function aggregate(func: CountAggregationFunction): CountAggregation;
-export function aggregate(func: PropertyAggregationFunction, property: string): PropertyAggregation;
-export function aggregate(func: UniqueAggregationFunction, property: string): UniqueAggregation;
-export function aggregate(func: AggregationFunction, property?: string): MeterAggregation {
+export function aggregate(
+  func: PropertyAggregationFunction,
+  property: NumericMeterPropertyInput,
+): PropertyAggregation;
+export function aggregate(
+  func: UniqueAggregationFunction,
+  property: UniqueMeterPropertyInput,
+): UniqueAggregation;
+export function aggregate(
+  func: AggregationFunction,
+  property?: MeterPropertyInput,
+): MeterAggregation {
   if (func === "count") return { func: "count" };
   if (property === undefined) {
     throw new TypeError(`Meter aggregation '${func}' requires a property.`);
   }
-  return { func, property };
+  return { func, property: aggregationPropertyPath(property) };
 }
 
 export const count = (): CountAggregation => ({ func: "count" });
 
-export const sum = (property: string): PropertyAggregation => ({ func: "sum", property });
-export const max = (property: string): PropertyAggregation => ({ func: "max", property });
-export const min = (property: string): PropertyAggregation => ({ func: "min", property });
-export const avg = (property: string): PropertyAggregation => ({ func: "avg", property });
-export const unique = (property: string): UniqueAggregation => ({ func: "unique", property });
+export function sum(property: string): PropertyAggregation;
+export function sum(property: EventMetadataRef<"number">): PropertyAggregation;
+export function sum(property: EventMetadataRef<EventMetadataValueType>): PropertyAggregation;
+export function sum(property: NumericMeterPropertyInput): PropertyAggregation {
+  return { func: "sum", property: aggregationPropertyPath(property) };
+}
 
-export const meterFilterSpec = (filter: MeterFilter): MeterFilterSpec => ({
-  conjunction: filter.conjunction,
-  clauses: filter.clauses.map((clause) =>
-    "clauses" in clause
-      ? meterFilterSpec(clause)
-      : {
-          property: clause.property,
-          operator: clause.operator,
-          value: clause.value,
-        },
-  ),
-});
+export function max(property: string): PropertyAggregation;
+export function max(property: EventMetadataRef<"number">): PropertyAggregation;
+export function max(property: EventMetadataRef<EventMetadataValueType>): PropertyAggregation;
+export function max(property: NumericMeterPropertyInput): PropertyAggregation {
+  return { func: "max", property: aggregationPropertyPath(property) };
+}
+
+export function min(property: string): PropertyAggregation;
+export function min(property: EventMetadataRef<"number">): PropertyAggregation;
+export function min(property: EventMetadataRef<EventMetadataValueType>): PropertyAggregation;
+export function min(property: NumericMeterPropertyInput): PropertyAggregation {
+  return { func: "min", property: aggregationPropertyPath(property) };
+}
+
+export function avg(property: string): PropertyAggregation;
+export function avg(property: EventMetadataRef<"number">): PropertyAggregation;
+export function avg(property: EventMetadataRef<EventMetadataValueType>): PropertyAggregation;
+export function avg(property: NumericMeterPropertyInput): PropertyAggregation {
+  return { func: "avg", property: aggregationPropertyPath(property) };
+}
+
+export function unique(property: string): UniqueAggregation;
+export function unique(property: EventMetadataRef<"string">): UniqueAggregation;
+export function unique(property: EventMetadataRef<"number">): UniqueAggregation;
+export function unique(property: EventMetadataRef<"boolean">): UniqueAggregation;
+export function unique(property: EventMetadataRef<EventMetadataValueType>): UniqueAggregation;
+export function unique(property: UniqueMeterPropertyInput): UniqueAggregation {
+  return { func: "unique", property: aggregationPropertyPath(property) };
+}
+
+export const meterFilterSpec = (filter: MeterFilterInput): MeterFilterSpec => {
+  if (!isMeterFilter(filter)) {
+    return meterFilterSpec(and(filter));
+  }
+
+  return {
+    conjunction: filter.conjunction,
+    clauses: filter.clauses.map((clause) =>
+      "clauses" in clause
+        ? meterFilterSpec(clause)
+        : {
+            property: clause.property,
+            operator: clause.operator,
+            value: clause.value,
+          },
+    ),
+  };
+};
 
 export const meterAggregationSpec = (aggregation: MeterAggregation): MeterAggregationSpec => {
   switch (aggregation.func) {

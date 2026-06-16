@@ -8,6 +8,16 @@ export type {
 } from "./core/resource.js";
 
 export { Benefit, benefitSpec } from "./resources/benefit.js";
+export { Event, interpretEventMetadataFields } from "./events/event.js";
+export type {
+  EventConfig,
+  EventDefinition,
+  EventMetadataField,
+  EventMetadataJsonSchemaLike,
+  EventMetadataRef,
+  EventMetadataRefs,
+  EventMetadataValueType,
+} from "./events/event.js";
 export type {
   BenefitAddress,
   BenefitConfig,
@@ -41,6 +51,7 @@ export {
 } from "./resources/meter.js";
 export type {
   AggregationFunction,
+  AnyEventMetadataRef,
   CountAggregation,
   CountAggregationFunction,
   CurrentMeterResource,
@@ -52,17 +63,21 @@ export type {
   MeterFilterClause,
   MeterFilterClauseSpec,
   MeterFilterConjunction,
+  MeterFilterInput,
   MeterFilterOperator,
   MeterFilterSpec,
   MeterFilterValue,
   MeterKind,
+  MeterPropertyInput,
   MeterResource,
   MeterSpec,
   MeterTimestampFilterValue,
+  NumericMeterPropertyInput,
   PropertyAggregation,
   PropertyAggregationFunction,
   UniqueAggregation,
   UniqueAggregationFunction,
+  UniqueMeterPropertyInput,
 } from "./resources/meter.js";
 export {
   Product,

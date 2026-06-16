@@ -128,11 +128,11 @@ export class GenerateCommand extends Context.Service<
       return GenerateCommand.of({
         generate: ({ config, path }) =>
           Effect.gen(function* () {
-            const desiredResources = yield* configLoader.loadDesiredResources(config);
+            const loadedConfig = yield* configLoader.loadConfig(config);
 
             const currentResourcesByAddress = yield* remoteResourceFetcher.fetch();
             const plan = yield* planner.plan({
-              desiredResources,
+              desiredResources: loadedConfig.desiredResources,
               currentResources: [...currentResourcesByAddress.values()],
             });
 
@@ -150,7 +150,10 @@ export class GenerateCommand extends Context.Service<
               ),
             );
 
-            const contents = yield* codeGenerator.generateRuntime(plan);
+            const contents = yield* codeGenerator.generateRuntime(
+              plan,
+              loadedConfig.eventDefinitions,
+            );
             const destination = yield* resolveGenerateOutputPath(path, fs, pathService);
 
             yield* fs.makeDirectory(destination.directory, { recursive: true });

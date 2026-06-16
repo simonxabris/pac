@@ -1,10 +1,32 @@
-import { Product, fixedPrice, Meter, meteredUnitPrice, and, eventName, sum, Benefit } from "pac";
+import {
+  Product,
+  fixedPrice,
+  Event,
+  Meter,
+  meteredUnitPrice,
+  and,
+  eventName,
+  sum,
+  Benefit,
+} from "@simonxabris/pac";
+import { z } from "zod";
+
+export const tokenConsumedEvent = new Event("token-consumed", {
+  name: "token_consumed",
+  metadata: z
+    .object({
+      total_tokens: z.number(),
+      model: z.string(),
+      cache_hit: z.boolean().optional(),
+    })
+    .toJSONSchema(),
+});
 
 export const tokens = new Meter("tokens", {
   name: "Pac tokens",
   unit: "token",
-  filter: and(eventName("eq", "token_consumed")),
-  aggregation: sum("total_tokens"),
+  filter: and(eventName(tokenConsumedEvent)),
+  aggregation: sum(tokenConsumedEvent.metadata.total_tokens),
 });
 
 export const includedTokens = new Benefit("included-tokens", {
