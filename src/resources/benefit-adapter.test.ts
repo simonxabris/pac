@@ -281,6 +281,7 @@ describe("BenefitResourceAdapter", () => {
               },
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -549,6 +550,7 @@ describe("BenefitResourceAdapter", () => {
               },
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -605,6 +607,10 @@ describe("BenefitResourceAdapter", () => {
           action: {
             _tag: "DeleteBenefit",
             id: "polar-included-requests",
+          },
+          destructiveness: {
+            _tag: "Destructive",
+            reason: "Delete-mode Benefit removal may revoke existing access or grants.",
           },
           rollback: {
             _tag: "UnsupportedRollback",

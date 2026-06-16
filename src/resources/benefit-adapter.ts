@@ -18,7 +18,9 @@ import type {
   ResourceExecutablePlanNode,
 } from "../services/resource-adapter-registry.js";
 import {
+  destructive,
   managedMetadata,
+  nonDestructive,
   polarIdRef,
   pushFieldChange,
   unsupportedRollback,
@@ -173,6 +175,7 @@ const createBenefitOperationFromPlanNode = (
           _tag: "CreateBenefit",
           payload: benefitCreatePayload(node),
         },
+        destructiveness: nonDestructive(),
         rollback: {
           _tag: "RollbackOperation",
           action: {
@@ -194,6 +197,7 @@ const createBenefitOperationFromPlanNode = (
         address: node.address,
         kind: "benefit",
         action,
+        destructiveness: nonDestructive(),
         rollback: {
           _tag: "RollbackOperation",
           action: {
@@ -214,6 +218,9 @@ const createBenefitOperationFromPlanNode = (
           _tag: "DeleteBenefit",
           id: node.current.polarId,
         },
+        destructiveness: destructive(
+          "Delete-mode Benefit removal may revoke existing access or grants.",
+        ),
         rollback: unsupportedRollback(
           "Delete rollback is not implemented because revoked grants cannot be restored.",
         ),

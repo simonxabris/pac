@@ -12,7 +12,9 @@ import type {
   ResourceExecutablePlanNode,
 } from "../services/resource-adapter-registry.js";
 import {
+  destructive,
   managedMetadata,
+  nonDestructive,
   polarIdRef,
   pushFieldChange,
   unsupportedRollback,
@@ -84,6 +86,7 @@ const createMeterOperationFromPlanNode = (
           _tag: "CreateMeter",
           payload: meterCreatePayload(node),
         },
+        destructiveness: nonDestructive(),
         rollback: {
           _tag: "RollbackOperation",
           action: {
@@ -106,6 +109,7 @@ const createMeterOperationFromPlanNode = (
         address: node.address,
         kind: "meter",
         action,
+        destructiveness: nonDestructive(),
         rollback: {
           _tag: "RollbackOperation",
           action: {
@@ -127,6 +131,9 @@ const createMeterOperationFromPlanNode = (
           id: node.current.polarId,
           payload: { isArchived: true },
         },
+        destructiveness: destructive(
+          "Archive-mode Meter removal removes the meter from active billing.",
+        ),
         rollback: unsupportedRollback("Archive rollback is not implemented yet."),
       };
   }

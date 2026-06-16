@@ -16,7 +16,7 @@ export const configFlag = Flag.string("config").pipe(
 );
 
 export const allowDeleteFlag = Flag.boolean("allow-delete").pipe(
-  Flag.withDescription("Allow destructive delete-mode removals during deploy"),
+  Flag.withDescription("Allow destructive operations during deploy"),
 );
 
 export const generatePathFlag = Flag.string("path").pipe(

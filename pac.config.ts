@@ -53,3 +53,14 @@ export const pro = new Product("pro", {
   recurringInterval: "month",
   benefits: [includedTokens, customBenefit],
 });
+
+// export const starter = new Product("starter", {
+//   name: "Pac Starter plan",
+//   description: "For starter users",
+//   prices: [
+//     fixedPrice({ amount: "10", currency: "usd" }),
+//     meteredUnitPrice({ meter: tokens, amount: "0.001", currency: "usd", capAmount: "10" }),
+//   ],
+//   recurringIntervalCount: 1,
+//   recurringInterval: "month",
+// });

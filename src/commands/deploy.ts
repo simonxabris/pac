@@ -1,38 +1,31 @@
-import { Schema } from "effect";
 import * as Effect from "effect/Effect";
 import * as Command from "effect/unstable/cli/Command";
+import * as Prompt from "effect/unstable/cli/Prompt";
+import { OperationDestructiveness, type Operation } from "../operations/operation.js";
 import { ConfigLoader } from "../services/config-loader.js";
 import { Executor } from "../services/executor.js";
 import { OperationPlanner } from "../services/operation-planner.js";
-import { Planner, type Plan } from "../services/planner.js";
+import { Planner } from "../services/planner.js";
 import { RemoteResourceFetcher } from "../services/remote-resource-fetcher.js";
 import { Renderer } from "../services/renderer.js";
 import { allowDeleteFlag, configFlag } from "./options.js";
 
-export class DeleteModeRemovalNotAllowed extends Schema.TaggedErrorClass<DeleteModeRemovalNotAllowed>()(
-  "DeleteModeRemovalNotAllowed",
-  {
-    addresses: Schema.Array(Schema.String),
-    message: Schema.String,
-  },
-) {}
+const confirmDestructiveOperation = (operation: Operation) => {
+  const { destructiveness } = operation;
 
-const assertDeleteModeRemovalsAllowed = (
-  plan: Plan,
-  allowDelete: boolean,
-): Effect.Effect<void, DeleteModeRemovalNotAllowed> => {
-  const deleteAddresses = [...plan.nodes.values()]
-    .filter((node) => node._tag === "Remove" && node.mode === "delete")
-    .map((node) => node.address);
-
-  if (allowDelete || deleteAddresses.length === 0) {
-    return Effect.void;
+  if (!OperationDestructiveness.guards.Destructive(destructiveness)) {
+    return Effect.succeed(true);
   }
 
-  return Effect.fail(
-    new DeleteModeRemovalNotAllowed({
-      addresses: deleteAddresses,
-      message: `Deploy contains delete-mode removals (${deleteAddresses.join(", ")}). Re-run with --allow-delete to confirm destructive deletion.`,
+  return Prompt.run(
+    Prompt.confirm({
+      message: `Destructive operation ${operation.action._tag} on ${operation.address}: ${destructiveness.reason}\nContinue?`,
+      initial: false,
+    }),
+  ).pipe(
+    Effect.match({
+      onFailure: () => false,
+      onSuccess: (confirmed) => confirmed,
     }),
   );
 };
@@ -57,9 +50,11 @@ export const deployCommand = Command.make(
       });
 
       yield* renderer.render(plan);
-      yield* assertDeleteModeRemovalsAllowed(plan, allowDelete);
 
       const program = yield* operationPlanner.create(plan);
-      yield* executor.execute(program);
+      yield* executor.execute(program, {
+        allowDestructive: allowDelete,
+        confirmDestructive: confirmDestructiveOperation,
+      });
     }),
 ).pipe(Command.withDescription("Apply Polar resource changes"));

@@ -243,6 +243,9 @@ export class Renderer extends Context.Service<
 
           if (archives.length > 0) {
             yield* Console.log(`\nArchive (${archives.length}):`);
+            yield* Console.log(
+              "  WARNING: archive-mode removals are destructive and remove resources from active use.",
+            );
             for (const node of archives) {
               yield* Console.log(renderNode(node));
             }

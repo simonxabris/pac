@@ -80,6 +80,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
               aggregation: { func: "sum", property: "quantity" },
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -166,6 +167,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
               aggregation: { func: "sum", property: "quantity" },
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {

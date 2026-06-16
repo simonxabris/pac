@@ -331,6 +331,20 @@ describe("OperationPlanner.create", () => {
         { address: "benefit.included-requests", kind: "benefit", action: "DeleteBenefit" },
         { address: "meter.requests", kind: "meter", action: "ArchiveMeter" },
       ]);
+      expect(operations.map((operation) => operation.destructiveness)).toEqual([
+        {
+          _tag: "Destructive",
+          reason: "Archive-mode Product removal removes the product from active sale.",
+        },
+        {
+          _tag: "Destructive",
+          reason: "Delete-mode Benefit removal may revoke existing access or grants.",
+        },
+        {
+          _tag: "Destructive",
+          reason: "Archive-mode Meter removal removes the meter from active billing.",
+        },
+      ]);
     }).pipe(Effect.provide(testLayer)),
   );
 
@@ -458,6 +472,22 @@ describe("OperationPlanner.create", () => {
         { address: "benefit.new-benefit", kind: "benefit", action: "CreateBenefit" },
         { address: "benefit.updated-benefit", kind: "benefit", action: "UpdateBenefit" },
         { address: "benefit.old-benefit", kind: "benefit", action: "DeleteBenefit" },
+      ]);
+      expect(
+        operations.map((operation) => ({
+          address: operation.address,
+          destructiveness: operation.destructiveness,
+        })),
+      ).toEqual([
+        { address: "benefit.new-benefit", destructiveness: { _tag: "NonDestructive" } },
+        { address: "benefit.updated-benefit", destructiveness: { _tag: "NonDestructive" } },
+        {
+          address: "benefit.old-benefit",
+          destructiveness: {
+            _tag: "Destructive",
+            reason: "Delete-mode Benefit removal may revoke existing access or grants.",
+          },
+        },
       ]);
     }).pipe(Effect.provide(testLayer)),
   );

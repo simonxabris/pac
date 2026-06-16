@@ -113,6 +113,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
               recurringIntervalCount: 1,
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -324,6 +325,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
                 ],
               },
             },
+            destructiveness: { _tag: "NonDestructive" },
             rollback: {
               _tag: "RollbackOperation",
               action: {
@@ -384,6 +386,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
             id: "polar-pro",
             payload: { name: "New Pro" },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -411,12 +414,58 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
               ],
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
               _tag: "UpdateProductBenefits",
               id: "polar-pro",
               payload: { benefits: [] },
+            },
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("creates an unarchive product update for an archived current Product", () =>
+    Effect.gen(function* () {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "3000", currency: "usd" })],
+      }).toDesiredResource();
+      const current = currentProductResource({ desired, isRemoved: true });
+
+      const operations = yield* ProductResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "product",
+          desired,
+          current,
+          changes: [{ _tag: "FieldChange", path: ["isArchived"], before: true, after: false }],
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations).toEqual([
+        {
+          _tag: "Operation",
+          id: "op_1",
+          address: "product.pro",
+          kind: "product",
+          action: {
+            _tag: "UpdateProduct",
+            id: "polar-pro",
+            payload: { isArchived: false },
+          },
+          destructiveness: { _tag: "NonDestructive" },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateProduct",
+              id: "polar-pro",
+              payload: { isArchived: true },
             },
           },
         },
@@ -488,6 +537,7 @@ describe("ProductResourceAdapter.createOperationsFromPlan", () => {
               ],
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -530,6 +580,38 @@ describe("ProductResourceAdapter.diff", () => {
           kind: "product",
           desired,
           current,
+        },
+        diagnostics: [],
+      });
+    }),
+  );
+
+  it.effect("returns an update node when a desired Product is currently archived", () =>
+    Effect.gen(function* () {
+      const desired = new Product("pro", {
+        name: "Pro",
+        prices: [fixedPrice({ amount: "2000", currency: "usd" })],
+      }).toDesiredResource();
+      const current = currentProductResource({ desired, isRemoved: true });
+
+      const result = yield* ProductResourceAdapter.diff(desired, current);
+
+      expect(result).toEqual({
+        _tag: "Planned",
+        node: {
+          _tag: "Update",
+          address: "product.pro",
+          kind: "product",
+          desired,
+          current,
+          changes: [
+            {
+              _tag: "FieldChange",
+              path: ["isArchived"],
+              before: true,
+              after: false,
+            },
+          ],
         },
         diagnostics: [],
       });

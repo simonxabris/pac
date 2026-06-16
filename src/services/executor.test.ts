@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { PAC_METADATA_KEY } from "../core/metadata.js";
-import { Executor } from "./executor.js";
+import { DestructiveOperationRejected, Executor, type ExecutorOptions } from "./executor.js";
 import type { OperationProgram } from "../types/operation-planner-types.js";
 import type { OperationAction } from "../operations/actions.js";
 import type {
@@ -9,7 +9,11 @@ import type {
   BenefitUpdateOperationPayload,
 } from "../operations/payloads/benefit.js";
 import type { ResourceBindings } from "../operations/bindings.js";
-import type { Operation, RollbackAction } from "../operations/operation.js";
+import {
+  OperationDestructiveness,
+  type Operation,
+  type RollbackAction,
+} from "../operations/operation.js";
 import type { MeterCreateOperationPayload } from "../operations/payloads/meter.js";
 import type {
   ProductBenefitsUpdateOperationPayload,
@@ -60,6 +64,7 @@ const operation = (input: {
   readonly address: ResourceAddress;
   readonly kind: ResourceKind;
   readonly action: OperationAction;
+  readonly destructiveness?: OperationDestructiveness;
   readonly rollback?: RollbackAction;
 }): Operation => ({
   _tag: "Operation",
@@ -67,6 +72,7 @@ const operation = (input: {
   address: input.address,
   kind: input.kind,
   action: input.action,
+  destructiveness: input.destructiveness ?? OperationDestructiveness.cases.NonDestructive.make({}),
   rollback: input.rollback ?? noopRollback(),
 });
 
@@ -96,6 +102,9 @@ const archiveProductOperation = (key: string, id: string): Operation =>
     address: address("product", key),
     kind: "product",
     action: { _tag: "ArchiveProduct", id, payload: { isArchived: true } },
+    destructiveness: OperationDestructiveness.cases.Destructive.make({
+      reason: "Archive-mode Product removal removes the product from active sale.",
+    }),
   });
 
 const updateProductBenefitsOperation = (
@@ -136,6 +145,9 @@ const deleteBenefitOperation = (key: string, id: string): Operation =>
     address: address("benefit", key),
     kind: "benefit",
     action: { _tag: "DeleteBenefit", id },
+    destructiveness: OperationDestructiveness.cases.Destructive.make({
+      reason: "Deletes a Benefit.",
+    }),
   });
 
 const createMeterOperation = (key: string, payload: MeterCreateOperationPayload): Operation =>
@@ -152,6 +164,9 @@ const archiveMeterOperation = (key: string, id: string): Operation =>
     address: address("meter", key),
     kind: "meter",
     action: { _tag: "ArchiveMeter", id, payload: { isArchived: true } },
+    destructiveness: OperationDestructiveness.cases.Destructive.make({
+      reason: "Archive-mode Meter removal removes the meter from active billing.",
+    }),
   });
 
 const program = (
@@ -293,14 +308,15 @@ const fakePolarClientLayer = (calls: Array<PolarCall>, failures: FakePolarFailur
 const testLayer = (calls: Array<PolarCall>, failures: FakePolarFailure = {}) =>
   Executor.layer.pipe(Layer.provide(fakePolarClientLayer(calls, failures)));
 
-const execute = (
+const execute = <E = never, R = never>(
   input: OperationProgram,
   calls: Array<PolarCall>,
   failures: FakePolarFailure = {},
+  options?: ExecutorOptions<E, R>,
 ) =>
   Effect.gen(function* () {
     const executor = yield* Executor;
-    yield* executor.execute(input);
+    yield* executor.execute(input, options);
   }).pipe(Effect.provide(testLayer(calls, failures)));
 
 describe("Executor product create dispatch", () => {
@@ -539,7 +555,14 @@ describe("Executor benefit dispatch", () => {
     Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
 
-      yield* execute(program([deleteBenefitOperation("included-requests", "ben_existing")]), calls);
+      yield* execute(
+        program([deleteBenefitOperation("included-requests", "ben_existing")]),
+        calls,
+        {},
+        {
+          allowDestructive: true,
+        },
+      );
 
       expect(calls).toEqual([
         {
@@ -587,6 +610,109 @@ describe("Executor product update dispatch", () => {
         },
       ]);
     }),
+  );
+});
+
+describe("Executor destructive operation confirmation", () => {
+  it.effect(
+    "stops before an unconfirmed destructive operation without rolling back prior work",
+    () =>
+      Effect.gen(function* () {
+        const calls: Array<PolarCall> = [];
+        const productAddress = address("product", "pro");
+        const oldProductAddress = address("product", "old");
+        const productPayload: ProductCreateOperationPayload = {
+          metadata: metadata("product", "pro"),
+          name: "Pro",
+          description: null,
+          visibility: "public",
+          prices: [fixedPrice(3000, "usd")],
+          recurringInterval: null,
+          recurringIntervalCount: null,
+        };
+
+        const result = yield* execute(
+          program([
+            operation({
+              id: "op_1",
+              address: productAddress,
+              kind: "product",
+              action: { _tag: "CreateProduct", payload: productPayload },
+              rollback: {
+                _tag: "RollbackOperation",
+                action: {
+                  _tag: "ArchiveProduct",
+                  id: polarIdRef(productAddress),
+                  payload: { isArchived: true },
+                },
+              },
+            }),
+            operation({
+              id: "op_2",
+              address: oldProductAddress,
+              kind: "product",
+              action: { _tag: "ArchiveProduct", id: "prod_old", payload: { isArchived: true } },
+              destructiveness: OperationDestructiveness.cases.Destructive.make({
+                reason: "Archive-mode Product removal removes the product from active sale.",
+              }),
+            }),
+            archiveMeterOperation("requests", "met_requests"),
+          ]),
+          calls,
+          {},
+          {
+            allowDestructive: false,
+            confirmDestructive: () => Effect.succeed(false),
+          },
+        ).pipe(
+          Effect.match({
+            onFailure: (error) => ({ _tag: "Failure" as const, error }),
+            onSuccess: () => ({ _tag: "Success" as const }),
+          }),
+        );
+
+        expect(result._tag).toBe("Failure");
+        if (result._tag === "Failure") {
+          expect(result.error).toBeInstanceOf(DestructiveOperationRejected);
+        }
+        expect(calls).toEqual([{ method: "createProduct", payload: productPayload }]);
+      }),
+  );
+
+  it.effect(
+    "executes destructive operations without confirmation when destructive work is allowed",
+    () =>
+      Effect.gen(function* () {
+        const calls: Array<PolarCall> = [];
+        let confirmations = 0;
+
+        yield* execute(
+          program([
+            operation({
+              id: "op_1",
+              address: address("benefit", "old"),
+              kind: "benefit",
+              action: { _tag: "DeleteBenefit", id: "ben_old" },
+              destructiveness: OperationDestructiveness.cases.Destructive.make({
+                reason: "Deletes a Benefit.",
+              }),
+            }),
+          ]),
+          calls,
+          {},
+          {
+            allowDestructive: true,
+            confirmDestructive: () =>
+              Effect.sync(() => {
+                confirmations += 1;
+                return false;
+              }),
+          },
+        );
+
+        expect(confirmations).toBe(0);
+        expect(calls).toEqual([{ method: "deleteBenefit", id: "ben_old" }]);
+      }),
   );
 });
 
@@ -712,7 +838,14 @@ describe("Executor archive dispatch", () => {
     Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
 
-      yield* execute(program([archiveProductOperation("pro", "prod_pro")]), calls);
+      yield* execute(
+        program([archiveProductOperation("pro", "prod_pro")]),
+        calls,
+        {},
+        {
+          allowDestructive: true,
+        },
+      );
 
       expect(calls).toEqual([
         {
@@ -727,7 +860,14 @@ describe("Executor archive dispatch", () => {
     Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
 
-      yield* execute(program([archiveMeterOperation("requests", "met_requests")]), calls);
+      yield* execute(
+        program([archiveMeterOperation("requests", "met_requests")]),
+        calls,
+        {},
+        {
+          allowDestructive: true,
+        },
+      );
 
       expect(calls).toEqual([
         {

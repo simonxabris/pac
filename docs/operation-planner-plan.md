@@ -191,13 +191,18 @@ Because symbolic references are definitely required, operations should move towa
 
 Operation execution is not transactional because Polar is an external API. Rollback should therefore be represented as **compensating operations**, not as a perfect inverse.
 
-Each operation should eventually carry its rollback/compensation action:
+Each operation should carry safety metadata plus its rollback/compensation action:
 
 ```ts
+export type OperationDestructiveness =
+  | { readonly _tag: "NonDestructive" }
+  | { readonly _tag: "Destructive"; readonly reason: string };
+
 export type Operation = {
   readonly id: string;
   readonly address: ResourceAddress;
   readonly action: OperationAction;
+  readonly destructiveness: OperationDestructiveness;
   readonly rollback: RollbackAction;
 };
 
@@ -206,6 +211,8 @@ export type RollbackAction =
   | { readonly _tag: "NoopRollback"; readonly reason: string }
   | { readonly _tag: "UnsupportedRollback"; readonly reason: string };
 ```
+
+The executor can use `destructiveness` to pause before destructive steps and request confirmation without having to infer safety from action names. Today, removal operations are destructive: archive-mode Product/Meter removals lower to destructive `ArchiveProduct` / `ArchiveMeter` operations, and delete-mode Benefit removals lower to destructive `DeleteBenefit` operations. Create/update operations lower as non-destructive.
 
 `OperationAction` is the concrete-ish API action union:
 

@@ -9,4 +9,4 @@ Removal mode is declared by each resource adapter:
 
 This replaces the generic `Archive` plan node, which encoded Polar-specific behavior into the planner. Current resources expose `isRemoved` as their lifecycle flag; provider decoders map their native fields (`isArchived`, `archivedAt`, `isDeleted`, etc.) into that generic state.
 
-`pac plan` renders both modes, while `pac deploy` refuses delete-mode removals unless `--allow-delete` is passed.
+`pac plan` renders both modes. During lowering, generated operations carry explicit `destructiveness` metadata (`NonDestructive` or `Destructive` with a reason). All active-resource removals lower to destructive operations: archive-mode Product/Meter removals become `ArchiveProduct` / `ArchiveMeter`, and delete-mode Benefit removals become `DeleteBenefit`. `pac deploy` asks for consent before destructive operations unless `--allow-delete` is passed.
