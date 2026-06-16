@@ -212,7 +212,7 @@ export type RollbackAction =
   | { readonly _tag: "UnsupportedRollback"; readonly reason: string };
 ```
 
-The executor can use `destructiveness` to pause before destructive steps and request confirmation without having to infer safety from action names. Today, removal operations are destructive: archive-mode Product/Meter removals lower to destructive `ArchiveProduct` / `ArchiveMeter` operations, and delete-mode Benefit removals lower to destructive `DeleteBenefit` operations. Create/update operations lower as non-destructive.
+The executor can use `destructiveness` to request confirmation before applying the operation program without having to infer safety from action names. Today, removal operations are destructive: archive-mode Product/Meter removals lower to destructive `ArchiveProduct` / `ArchiveMeter` operations, and delete-mode Benefit removals lower to destructive `DeleteBenefit` operations. Create/update operations lower as non-destructive.
 
 `OperationAction` is the concrete-ish API action union:
 

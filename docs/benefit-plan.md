@@ -190,7 +190,7 @@ The renderer must show separate `Archive` and `Delete` sections. Benefit
 deletion should also emit a warning that existing grants will be revoked.
 
 Recommended safety rule: `pac deploy` asks for consent before executing any
-removal operation unless passed `--allow-delete`. `pac plan` always renders them.
+removal operation unless passed `--allow-destructive`. `pac plan` always renders them.
 
 This generic removal change should receive an ADR because it changes a central
 planning concept and preserves the distinction between archival and destructive
@@ -379,7 +379,7 @@ Core planning:
 - `src/operation-planner.ts`: preserve reverse dependency ordering for Remove.
 - `src/operation-planner/types.ts`: use `RemovePlanNode`.
 - `src/renderer.ts`: render Archive and Delete distinctly.
-- `src/cli.ts`: add `--allow-delete` deployment guard.
+- `src/cli.ts`: add `--allow-destructive` deployment guard.
 
 Benefit resource:
 
@@ -471,7 +471,7 @@ Renderer/CLI tests:
 
 - removal sections are visibly destructive;
 - removal operations lower with explicit destructive metadata;
-- deploy asks for consent before destructive operations unless `--allow-delete` is passed.
+- deploy asks for destructive-operation consent before applying any operation unless `--allow-destructive` is passed.
 
 ## Implementation Order
 

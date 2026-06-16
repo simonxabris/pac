@@ -614,69 +614,111 @@ describe("Executor product update dispatch", () => {
 });
 
 describe("Executor destructive operation confirmation", () => {
-  it.effect(
-    "stops before an unconfirmed destructive operation without rolling back prior work",
-    () =>
-      Effect.gen(function* () {
-        const calls: Array<PolarCall> = [];
-        const productAddress = address("product", "pro");
-        const oldProductAddress = address("product", "old");
-        const productPayload: ProductCreateOperationPayload = {
-          metadata: metadata("product", "pro"),
-          name: "Pro",
-          description: null,
-          visibility: "public",
-          prices: [fixedPrice(3000, "usd")],
-          recurringInterval: null,
-          recurringIntervalCount: null,
-        };
+  it.effect("confirms destructive operations before executing any work", () =>
+    Effect.gen(function* () {
+      const calls: Array<PolarCall> = [];
+      const productAddress = address("product", "pro");
+      const oldProductAddress = address("product", "old");
+      const productPayload: ProductCreateOperationPayload = {
+        metadata: metadata("product", "pro"),
+        name: "Pro",
+        description: null,
+        visibility: "public",
+        prices: [fixedPrice(3000, "usd")],
+        recurringInterval: null,
+        recurringIntervalCount: null,
+      };
 
-        const result = yield* execute(
-          program([
-            operation({
-              id: "op_1",
-              address: productAddress,
-              kind: "product",
-              action: { _tag: "CreateProduct", payload: productPayload },
-              rollback: {
-                _tag: "RollbackOperation",
-                action: {
-                  _tag: "ArchiveProduct",
-                  id: polarIdRef(productAddress),
-                  payload: { isArchived: true },
-                },
+      const result = yield* execute(
+        program([
+          operation({
+            id: "op_1",
+            address: productAddress,
+            kind: "product",
+            action: { _tag: "CreateProduct", payload: productPayload },
+            rollback: {
+              _tag: "RollbackOperation",
+              action: {
+                _tag: "ArchiveProduct",
+                id: polarIdRef(productAddress),
+                payload: { isArchived: true },
               },
-            }),
-            operation({
-              id: "op_2",
-              address: oldProductAddress,
-              kind: "product",
-              action: { _tag: "ArchiveProduct", id: "prod_old", payload: { isArchived: true } },
-              destructiveness: OperationDestructiveness.cases.Destructive.make({
-                reason: "Archive-mode Product removal removes the product from active sale.",
-              }),
-            }),
-            archiveMeterOperation("requests", "met_requests"),
-          ]),
-          calls,
-          {},
-          {
-            allowDestructive: false,
-            confirmDestructive: () => Effect.succeed(false),
-          },
-        ).pipe(
-          Effect.match({
-            onFailure: (error) => ({ _tag: "Failure" as const, error }),
-            onSuccess: () => ({ _tag: "Success" as const }),
+            },
           }),
-        );
+          operation({
+            id: "op_2",
+            address: oldProductAddress,
+            kind: "product",
+            action: { _tag: "ArchiveProduct", id: "prod_old", payload: { isArchived: true } },
+            destructiveness: OperationDestructiveness.cases.Destructive.make({
+              reason: "Archive-mode Product removal removes the product from active sale.",
+            }),
+          }),
+          archiveMeterOperation("requests", "met_requests"),
+        ]),
+        calls,
+        {},
+        {
+          allowDestructive: false,
+          confirmDestructive: () => Effect.succeed(false),
+        },
+      ).pipe(
+        Effect.match({
+          onFailure: (error) => ({ _tag: "Failure" as const, error }),
+          onSuccess: () => ({ _tag: "Success" as const }),
+        }),
+      );
 
-        expect(result._tag).toBe("Failure");
-        if (result._tag === "Failure") {
-          expect(result.error).toBeInstanceOf(DestructiveOperationRejected);
-        }
-        expect(calls).toEqual([{ method: "createProduct", payload: productPayload }]);
-      }),
+      expect(result._tag).toBe("Failure");
+      if (result._tag === "Failure") {
+        expect(result.error).toBeInstanceOf(DestructiveOperationRejected);
+      }
+      expect(calls).toEqual([]);
+    }),
+  );
+
+  it.effect("rejects before execution when any upfront destructive confirmation is declined", () =>
+    Effect.gen(function* () {
+      const calls: Array<PolarCall> = [];
+      const confirmedOperations: Array<string> = [];
+
+      const result = yield* execute(
+        program([
+          createMeterOperation("requests", {
+            metadata: metadata("meter", "requests"),
+            name: "Requests",
+            unit: "scalar",
+            customLabel: null,
+            customMultiplier: null,
+            filter: { conjunction: "and", clauses: [] },
+            aggregation: { func: "count" },
+          }),
+          archiveProductOperation("old-product", "prod_old"),
+          deleteBenefitOperation("old-benefit", "ben_old"),
+        ]),
+        calls,
+        {},
+        {
+          confirmDestructive: (operation) =>
+            Effect.sync(() => {
+              confirmedOperations.push(operation.id);
+              return operation.action._tag !== "DeleteBenefit";
+            }),
+        },
+      ).pipe(
+        Effect.match({
+          onFailure: (error) => ({ _tag: "Failure" as const, error }),
+          onSuccess: () => ({ _tag: "Success" as const }),
+        }),
+      );
+
+      expect(result._tag).toBe("Failure");
+      expect(confirmedOperations).toEqual([
+        "op_archive_product_old-product",
+        "op_delete_benefit_old-benefit",
+      ]);
+      expect(calls).toEqual([]);
+    }),
   );
 
   it.effect(

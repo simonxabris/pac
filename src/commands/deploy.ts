@@ -8,7 +8,7 @@ import { OperationPlanner } from "../services/operation-planner.js";
 import { Planner } from "../services/planner.js";
 import { RemoteResourceFetcher } from "../services/remote-resource-fetcher.js";
 import { Renderer } from "../services/renderer.js";
-import { allowDeleteFlag, configFlag } from "./options.js";
+import { allowDestructiveFlag, configFlag } from "./options.js";
 
 const confirmDestructiveOperation = (operation: Operation) => {
   const { destructiveness } = operation;
@@ -32,8 +32,8 @@ const confirmDestructiveOperation = (operation: Operation) => {
 
 export const deployCommand = Command.make(
   "deploy",
-  { config: configFlag, allowDelete: allowDeleteFlag },
-  ({ config, allowDelete }) =>
+  { config: configFlag, allowDestructive: allowDestructiveFlag },
+  ({ config, allowDestructive }) =>
     Effect.gen(function* () {
       const configLoader = yield* ConfigLoader;
       const loadedConfig = yield* configLoader.loadConfig(config);
@@ -53,7 +53,7 @@ export const deployCommand = Command.make(
 
       const program = yield* operationPlanner.create(plan);
       yield* executor.execute(program, {
-        allowDestructive: allowDelete,
+        allowDestructive,
         confirmDestructive: confirmDestructiveOperation,
       });
     }),

@@ -203,25 +203,12 @@ export class Executor extends Context.Service<
           }),
         );
 
-      const confirmOperation = <E, R>(
+      const rejectUnconfirmedOperation = (
         operation: Operation,
-        options: ExecutorOptions<E, R> | undefined,
-      ): Effect.Effect<void, DestructiveOperationRejected | E, R> =>
-        Effect.gen(function* () {
-          if (!isDestructiveOperation(operation) || options?.allowDestructive === true) {
-            return;
-          }
-
-          const confirmed = options?.confirmDestructive
-            ? yield* options.confirmDestructive(operation)
-            : false;
-
-          if (confirmed) {
-            return;
-          }
-
-          const destructiveness = operation.destructiveness;
-          return yield* new DestructiveOperationRejected({
+      ): Effect.Effect<never, DestructiveOperationRejected> => {
+        const destructiveness = operation.destructiveness;
+        return Effect.fail(
+          new DestructiveOperationRejected({
             operationId: operation.id,
             address: operation.address,
             action: operation.action._tag,
@@ -229,19 +216,37 @@ export class Executor extends Context.Service<
               ? destructiveness.reason
               : "",
             message: `Destructive operation ${operation.action._tag} on ${operation.address} was not confirmed.`,
-          });
+          }),
+        );
+      };
+
+      const confirmDestructiveOperations = <E, R>(
+        operations: ReadonlyArray<Operation>,
+        options: ExecutorOptions<E, R> | undefined,
+      ): Effect.Effect<void, DestructiveOperationRejected | E, R> =>
+        Effect.gen(function* () {
+          if (options?.allowDestructive === true) {
+            return;
+          }
+
+          for (const operation of operations.filter(isDestructiveOperation)) {
+            const confirmed = options?.confirmDestructive
+              ? yield* options.confirmDestructive(operation)
+              : false;
+
+            if (!confirmed) {
+              return yield* rejectUnconfirmedOperation(operation);
+            }
+          }
         });
 
-      const executeOperations = <E, R>(
+      const executeOperations = (
         operations: ReadonlyArray<Operation>,
         bindings: ExecutionBindings,
         rollbackStack: Array<OperationAction>,
-        options: ExecutorOptions<E, R> | undefined,
-      ): Effect.Effect<Exit.Exit<void, ExecutorError>, DestructiveOperationRejected | E, R> =>
+      ): Effect.Effect<Exit.Exit<void, ExecutorError>> =>
         Effect.gen(function* () {
           for (const operation of operations) {
-            yield* confirmOperation(operation, options);
-
             const exit = yield* executeOperation(operation, bindings);
 
             if (Exit.isFailure(exit)) {
@@ -262,12 +267,9 @@ export class Executor extends Context.Service<
             const bindings: ExecutionBindings = new Map(program.initialBindings);
             const rollbackStack: Array<OperationAction> = [];
 
-            const result = yield* executeOperations(
-              program.operations,
-              bindings,
-              rollbackStack,
-              options,
-            );
+            yield* confirmDestructiveOperations(program.operations, options);
+
+            const result = yield* executeOperations(program.operations, bindings, rollbackStack);
 
             if (Exit.isFailure(result)) {
               yield* rollback(rollbackStack, bindings);

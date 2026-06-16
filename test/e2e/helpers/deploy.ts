@@ -10,7 +10,7 @@ export const deployConfig = async (configPath: string, env: NodeJS.ProcessEnv): 
         "deploy",
         "--config",
         resolve(process.cwd(), configPath),
-        "--allow-delete",
+        "--allow-destructive",
       ],
       {
         cwd: process.cwd(),
