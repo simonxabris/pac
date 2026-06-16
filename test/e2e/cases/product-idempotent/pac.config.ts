@@ -1,4 +1,4 @@
-import { Product, fixedPrice } from "pac";
+import { Product, fixedPrice } from "@simonxabris/pac";
 
 export const idempotent = new Product("idempotent", {
   name: "E2E Idempotent Product",

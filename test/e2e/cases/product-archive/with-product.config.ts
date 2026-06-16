@@ -1,4 +1,4 @@
-import { Product, fixedPrice } from "pac";
+import { Product, fixedPrice } from "@simonxabris/pac";
 
 export const archived = new Product("archive-me", {
   name: "E2E Product To Archive",

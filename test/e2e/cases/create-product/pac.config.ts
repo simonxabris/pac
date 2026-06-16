@@ -1,4 +1,4 @@
-import { Product, fixedPrice } from "pac";
+import { Product, fixedPrice } from "@simonxabris/pac";
 
 export const starter = new Product("starter", {
   name: "E2E Starter Product",

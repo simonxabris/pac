@@ -1,4 +1,13 @@
-import { Meter, Product, and, eventName, fixedPrice, metadata, meteredUnitPrice, sum } from "pac";
+import {
+  Meter,
+  Product,
+  and,
+  eventName,
+  fixedPrice,
+  metadata,
+  meteredUnitPrice,
+  sum,
+} from "@simonxabris/pac";
 
 export const requests = new Meter("metered-product-requests", {
   name: "E2E Metered Product Requests V1",

@@ -1,4 +1,4 @@
-import { Product, fixedPrice } from "pac";
+import { Product, fixedPrice } from "@simonxabris/pac";
 
 export const immutable = new Product("immutable-recurring", {
   name: "E2E Immutable Recurring Product",

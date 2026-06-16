@@ -1,4 +1,4 @@
-import { Product, customPrice, fixedPrice, freePrice } from "pac";
+import { Product, customPrice, fixedPrice, freePrice } from "@simonxabris/pac";
 
 export const fixedRecurring = new Product("full-shape-fixed-recurring", {
   name: "E2E Full Shape Fixed Recurring",
