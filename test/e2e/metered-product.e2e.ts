@@ -3,7 +3,13 @@ import type { Product as RemoteProduct } from "@polar-sh/sdk/models/components/p
 import { describe, expect, it } from "vitest";
 import { deployConfig } from "./helpers/deploy.js";
 import { e2eOrganizationFromEnv } from "./helpers/env.js";
-import { findMeterByKey, findProductByKey, pacMetadata } from "./helpers/polar.js";
+import {
+  findMeterByKey,
+  findMetersByKey,
+  findProductByKey,
+  getMeterById,
+  pacMetadata,
+} from "./helpers/polar.js";
 
 type RemoteProductPrice = RemoteProduct["prices"][number];
 
@@ -36,6 +42,32 @@ const priceByType = <T extends RemoteProductPrice["amountType"]>(
 };
 
 describe("metered Product e2e", () => {
+  it("restores a Meter when an archived managed Meter is added back to config", async () => {
+    const org = e2eOrganizationFromEnv();
+    const config = "test/e2e/cases/meter-restore/with-meter.config.ts";
+
+    await deployConfig(config, org.env);
+    const meterBeforeRemoval = requireMeter(
+      await findMeterByKey(org, "restore-archived-meter"),
+      "restore-archived-meter",
+    );
+    expect(meterBeforeRemoval.archivedAt ?? null).toBeNull();
+
+    await deployConfig("test/e2e/cases/product-archive/empty.config.ts", org.env);
+
+    const meterAfterRemoval = await getMeterById(org, meterBeforeRemoval.id);
+    expect(meterAfterRemoval.id).toBe(meterBeforeRemoval.id);
+    expect(meterAfterRemoval.archivedAt ?? null).not.toBeNull();
+
+    await deployConfig(config, org.env);
+
+    const metersAfterRestore = await findMetersByKey(org, "restore-archived-meter");
+    expect(
+      metersAfterRestore.some((meter) => (meter.archivedAt ?? null) === null),
+      "Expected deploy to make at least one managed meter active after it was added back to config",
+    ).toBe(true);
+  });
+
   it("creates a Meter used by a metered Product price, then updates only the Meter", async () => {
     const org = e2eOrganizationFromEnv();
 

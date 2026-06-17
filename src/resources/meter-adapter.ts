@@ -33,14 +33,21 @@ const meterCreatePayload = (
   aggregation: node.desired.spec.aggregation as MeterCreateOperationPayload["aggregation"],
 });
 
-const hasChanged = (changes: ReadonlyArray<FieldChange>, field: keyof MeterSpec): boolean =>
-  changes.some((change) => change.path[0] === field);
+const hasChanged = (
+  changes: ReadonlyArray<FieldChange>,
+  field: keyof MeterSpec | "isArchived",
+): boolean => changes.some((change) => change.path[0] === field);
 
 const meterUpdatePayload = (
   spec: MeterSpec,
   changes: ReadonlyArray<FieldChange>,
+  isArchived?: boolean,
 ): MeterUpdateOperationPayload => {
   const payload: MeterUpdateOperationPayload = {};
+
+  if (hasChanged(changes, "isArchived")) {
+    payload.isArchived = isArchived;
+  }
 
   if (hasChanged(changes, "name")) {
     payload.name = spec.name;
@@ -100,7 +107,7 @@ const createMeterOperationFromPlanNode = (
       const action: OperationAction = {
         _tag: "UpdateMeter",
         id: node.current.polarId,
-        payload: meterUpdatePayload(node.desired.spec, node.changes),
+        payload: meterUpdatePayload(node.desired.spec, node.changes, false),
       };
 
       return {
@@ -115,7 +122,7 @@ const createMeterOperationFromPlanNode = (
           action: {
             _tag: "UpdateMeter",
             id: node.current.polarId,
-            payload: meterUpdatePayload(node.current.spec, node.changes),
+            payload: meterUpdatePayload(node.current.spec, node.changes, node.current.isRemoved),
           },
         },
       };
@@ -149,6 +156,7 @@ export const MeterResourceAdapter: ResourceAdapter<MeterKind, MeterSpec> = {
     Effect.sync(() => {
       const changes: Array<FieldChange> = [];
 
+      pushFieldChange(changes, ["isArchived"], current.isRemoved, false);
       pushFieldChange(changes, ["name"], current.spec.name, desired.spec.name);
       pushFieldChange(changes, ["unit"], current.spec.unit, desired.spec.unit);
       pushFieldChange(changes, ["customLabel"], current.spec.customLabel, desired.spec.customLabel);
