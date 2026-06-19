@@ -334,15 +334,15 @@ describe("OperationPlanner.create", () => {
       expect(operations.map((operation) => operation.destructiveness)).toEqual([
         {
           _tag: "Destructive",
-          reason: "Archive-mode Product removal removes the product from active sale.",
+          reason: "Removes the product from active sale.",
         },
         {
           _tag: "Destructive",
-          reason: "Delete-mode Benefit removal may revoke existing access or grants.",
+          reason: "May revoke existing access or grants.",
         },
         {
           _tag: "Destructive",
-          reason: "Archive-mode Meter removal removes the meter from active billing.",
+          reason: "Removes the meter from active billing.",
         },
       ]);
     }).pipe(Effect.provide(testLayer)),
@@ -485,7 +485,7 @@ describe("OperationPlanner.create", () => {
           address: "benefit.old-benefit",
           destructiveness: {
             _tag: "Destructive",
-            reason: "Delete-mode Benefit removal may revoke existing access or grants.",
+            reason: "May revoke existing access or grants.",
           },
         },
       ]);

@@ -347,9 +347,7 @@ const createProductOperationFromPlanNode = (
             id: node.current.polarId,
             payload: { isArchived: true },
           },
-          destructiveness: destructive(
-            "Archive-mode Product removal removes the product from active sale.",
-          ),
+          destructiveness: destructive("Removes the product from active sale."),
           rollback: unsupportedRollback("Archive rollback is not implemented yet."),
         },
       ];

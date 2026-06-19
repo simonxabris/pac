@@ -610,7 +610,7 @@ describe("BenefitResourceAdapter", () => {
           },
           destructiveness: {
             _tag: "Destructive",
-            reason: "Delete-mode Benefit removal may revoke existing access or grants.",
+            reason: "May revoke existing access or grants.",
           },
           rollback: {
             _tag: "UnsupportedRollback",

@@ -11,6 +11,7 @@ import {
 } from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
 import { PolarClient, PolarClientError } from "./polar-client.js";
+import { DestructiveConfirmation } from "./destructive-confirmation.js";
 
 export type { ResourceBinding, ResourceBindings } from "../operations/bindings.js";
 
@@ -34,9 +35,8 @@ export class DestructiveOperationRejected extends Schema.TaggedErrorClass<Destru
   },
 ) {}
 
-export type ExecutorOptions<E = never, R = never> = {
+export type ExecutorOptions = {
   readonly allowDestructive?: boolean;
-  readonly confirmDestructive?: (operation: Operation) => Effect.Effect<boolean, E, R>;
 };
 
 type DeepResolved<T> = T extends OperationRef
@@ -114,16 +114,17 @@ const recordBinding = (
 export class Executor extends Context.Service<
   Executor,
   {
-    readonly execute: <E = never, R = never>(
+    readonly execute: (
       program: OperationProgram,
-      options?: ExecutorOptions<E, R>,
-    ) => Effect.Effect<void, ExecutorFailure | E, R>;
+      options?: ExecutorOptions,
+    ) => Effect.Effect<void, ExecutorFailure>;
   }
 >()("@app/Executor") {
   static readonly layer = Layer.effect(
     Executor,
     Effect.gen(function* () {
       const polar = yield* PolarClient;
+      const destructiveConfirmation = yield* DestructiveConfirmation;
 
       const executeResolvedAction = (
         action: ResolvedOperationAction,
@@ -220,23 +221,24 @@ export class Executor extends Context.Service<
         );
       };
 
-      const confirmDestructiveOperations = <E, R>(
+      const confirmDestructiveOperations = (
         operations: ReadonlyArray<Operation>,
-        options: ExecutorOptions<E, R> | undefined,
-      ): Effect.Effect<void, DestructiveOperationRejected | E, R> =>
+        options: ExecutorOptions | undefined,
+      ): Effect.Effect<void, DestructiveOperationRejected> =>
         Effect.gen(function* () {
           if (options?.allowDestructive === true) {
             return;
           }
 
-          for (const operation of operations.filter(isDestructiveOperation)) {
-            const confirmed = options?.confirmDestructive
-              ? yield* options.confirmDestructive(operation)
-              : false;
+          const destructiveOperations = operations.filter(isDestructiveOperation);
+          if (destructiveOperations.length === 0) {
+            return;
+          }
 
-            if (!confirmed) {
-              return yield* rejectUnconfirmedOperation(operation);
-            }
+          const confirmed = yield* destructiveConfirmation.confirm(destructiveOperations);
+
+          if (!confirmed) {
+            return yield* rejectUnconfirmedOperation(destructiveOperations[0]!);
           }
         });
 

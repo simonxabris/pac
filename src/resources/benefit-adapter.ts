@@ -218,9 +218,7 @@ const createBenefitOperationFromPlanNode = (
           _tag: "DeleteBenefit",
           id: node.current.polarId,
         },
-        destructiveness: destructive(
-          "Delete-mode Benefit removal may revoke existing access or grants.",
-        ),
+        destructiveness: destructive("May revoke existing access or grants."),
         rollback: unsupportedRollback(
           "Delete rollback is not implemented because revoked grants cannot be restored.",
         ),

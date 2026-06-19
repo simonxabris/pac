@@ -37,6 +37,7 @@
     "@polar-sh/sdk": "^0.47.1",
     "@vitest/coverage-v8": "^4.1.8",
     "effect": "4.0.0-beta.76",
+    "kleur": "^4.1.5",
     "ts-morph": "^28.0.0"
   },
   "devDependencies": {

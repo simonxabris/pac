@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { PAC_METADATA_KEY } from "../core/metadata.js";
+import {
+  DestructiveConfirmation,
+  type DestructiveConfirmationShape,
+} from "./destructive-confirmation.js";
 import { DestructiveOperationRejected, Executor, type ExecutorOptions } from "./executor.js";
 import type { OperationProgram } from "../types/operation-planner-types.js";
 import type { OperationAction } from "../operations/actions.js";
@@ -103,7 +107,7 @@ const archiveProductOperation = (key: string, id: string): Operation =>
     kind: "product",
     action: { _tag: "ArchiveProduct", id, payload: { isArchived: true } },
     destructiveness: OperationDestructiveness.cases.Destructive.make({
-      reason: "Archive-mode Product removal removes the product from active sale.",
+      reason: "Removes the product from active sale.",
     }),
   });
 
@@ -165,7 +169,7 @@ const archiveMeterOperation = (key: string, id: string): Operation =>
     kind: "meter",
     action: { _tag: "ArchiveMeter", id, payload: { isArchived: true } },
     destructiveness: OperationDestructiveness.cases.Destructive.make({
-      reason: "Archive-mode Meter removal removes the meter from active billing.",
+      reason: "Removes the meter from active billing.",
     }),
   });
 
@@ -305,19 +309,35 @@ const fakePolarClientLayer = (calls: Array<PolarCall>, failures: FakePolarFailur
     } satisfies PolarClientShape),
   );
 
-const testLayer = (calls: Array<PolarCall>, failures: FakePolarFailure = {}) =>
-  Executor.layer.pipe(Layer.provide(fakePolarClientLayer(calls, failures)));
+const testLayer = (
+  calls: Array<PolarCall>,
+  failures: FakePolarFailure = {},
+  destructiveConfirmation: DestructiveConfirmationShape = DestructiveConfirmation.of({
+    confirm: () => Effect.succeed(false),
+  }),
+) =>
+  Executor.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        fakePolarClientLayer(calls, failures),
+        Layer.succeed(DestructiveConfirmation, destructiveConfirmation),
+      ),
+    ),
+  );
 
-const execute = <E = never, R = never>(
+const execute = (
   input: OperationProgram,
   calls: Array<PolarCall>,
   failures: FakePolarFailure = {},
-  options?: ExecutorOptions<E, R>,
+  options?: ExecutorOptions,
+  destructiveConfirmation: DestructiveConfirmationShape = DestructiveConfirmation.of({
+    confirm: () => Effect.succeed(false),
+  }),
 ) =>
   Effect.gen(function* () {
     const executor = yield* Executor;
     yield* executor.execute(input, options);
-  }).pipe(Effect.provide(testLayer(calls, failures)));
+  }).pipe(Effect.provide(testLayer(calls, failures, destructiveConfirmation)));
 
 describe("Executor product create dispatch", () => {
   it.effect("creates a product with all supported product fields and a fixed price", () =>
@@ -651,7 +671,7 @@ describe("Executor destructive operation confirmation", () => {
             kind: "product",
             action: { _tag: "ArchiveProduct", id: "prod_old", payload: { isArchived: true } },
             destructiveness: OperationDestructiveness.cases.Destructive.make({
-              reason: "Archive-mode Product removal removes the product from active sale.",
+              reason: "Removes the product from active sale.",
             }),
           }),
           archiveMeterOperation("requests", "met_requests"),
@@ -660,7 +680,6 @@ describe("Executor destructive operation confirmation", () => {
         {},
         {
           allowDestructive: false,
-          confirmDestructive: () => Effect.succeed(false),
         },
       ).pipe(
         Effect.match({
@@ -677,10 +696,18 @@ describe("Executor destructive operation confirmation", () => {
     }),
   );
 
-  it.effect("rejects before execution when any upfront destructive confirmation is declined", () =>
+  it.effect("rejects before execution when batch destructive confirmation is declined", () =>
     Effect.gen(function* () {
       const calls: Array<PolarCall> = [];
-      const confirmedOperations: Array<string> = [];
+      const confirmedBatches: Array<ReadonlyArray<string>> = [];
+
+      const destructiveConfirmation = DestructiveConfirmation.of({
+        confirm: (operations) =>
+          Effect.sync(() => {
+            confirmedBatches.push(operations.map((operation) => operation.id));
+            return false;
+          }),
+      });
 
       const result = yield* execute(
         program([
@@ -698,13 +725,8 @@ describe("Executor destructive operation confirmation", () => {
         ]),
         calls,
         {},
-        {
-          confirmDestructive: (operation) =>
-            Effect.sync(() => {
-              confirmedOperations.push(operation.id);
-              return operation.action._tag !== "DeleteBenefit";
-            }),
-        },
+        undefined,
+        destructiveConfirmation,
       ).pipe(
         Effect.match({
           onFailure: (error) => ({ _tag: "Failure" as const, error }),
@@ -713,9 +735,8 @@ describe("Executor destructive operation confirmation", () => {
       );
 
       expect(result._tag).toBe("Failure");
-      expect(confirmedOperations).toEqual([
-        "op_archive_product_old-product",
-        "op_delete_benefit_old-benefit",
+      expect(confirmedBatches).toEqual([
+        ["op_archive_product_old-product", "op_delete_benefit_old-benefit"],
       ]);
       expect(calls).toEqual([]);
     }),
@@ -727,6 +748,14 @@ describe("Executor destructive operation confirmation", () => {
       Effect.gen(function* () {
         const calls: Array<PolarCall> = [];
         let confirmations = 0;
+
+        const destructiveConfirmation = DestructiveConfirmation.of({
+          confirm: () =>
+            Effect.sync(() => {
+              confirmations += 1;
+              return false;
+            }),
+        });
 
         yield* execute(
           program([
@@ -744,12 +773,8 @@ describe("Executor destructive operation confirmation", () => {
           {},
           {
             allowDestructive: true,
-            confirmDestructive: () =>
-              Effect.sync(() => {
-                confirmations += 1;
-                return false;
-              }),
           },
+          destructiveConfirmation,
         );
 
         expect(confirmations).toBe(0);

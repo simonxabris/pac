@@ -138,9 +138,7 @@ const createMeterOperationFromPlanNode = (
           id: node.current.polarId,
           payload: { isArchived: true },
         },
-        destructiveness: destructive(
-          "Archive-mode Meter removal removes the meter from active billing.",
-        ),
+        destructiveness: destructive("Removes the meter from active billing."),
         rollback: unsupportedRollback("Archive rollback is not implemented yet."),
       };
   }
