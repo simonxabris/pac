@@ -211,4 +211,30 @@ describe("product e2e", () => {
     expect(productAfterSecondRemoval.id).toBe(productBeforeRemoval.id);
     expect(productAfterSecondRemoval.isArchived).toBe(true);
   });
+
+  it("restores a Product when an archived managed Product is added back to config", async () => {
+    const org = e2eOrganizationFromEnv();
+    const config = "test/e2e/cases/product-restore/with-product.config.ts";
+
+    await deployConfig(config, org.env);
+    const productBeforeRemoval = requireProduct(
+      await findProductByKey(org, "restore-archived"),
+      "restore-archived",
+    );
+    expect(productBeforeRemoval.isArchived).toBe(false);
+
+    await deployConfig("test/e2e/cases/product-archive/empty.config.ts", org.env);
+
+    const productAfterRemoval = await getProductById(org, productBeforeRemoval.id);
+    expect(productAfterRemoval.id).toBe(productBeforeRemoval.id);
+    expect(productAfterRemoval.isArchived).toBe(true);
+
+    await deployConfig(config, org.env);
+
+    const productsAfterRestore = await findProductsByKey(org, "restore-archived");
+    expect(
+      productsAfterRestore.some((product) => !product.isArchived),
+      "Expected deploy to make at least one managed product active after it was added back to config",
+    ).toBe(true);
+  });
 });

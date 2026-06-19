@@ -16,13 +16,14 @@ import { resetRegistry } from "./registry.js";
 const currentFromDesired = (
   desired: MeterResource,
   spec: CurrentMeterResource["spec"] = desired.spec,
+  isRemoved = false,
 ): CurrentMeterResource => ({
   source: "current",
   kind: "meter",
   key: desired.key,
   address: desired.address,
   polarId: `polar-${desired.key}`,
-  isRemoved: false,
+  isRemoved,
   spec,
 });
 
@@ -80,6 +81,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
               aggregation: { func: "sum", property: "quantity" },
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -89,6 +91,53 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
                 address: "meter.requests",
                 field: "polarId",
               },
+              payload: { isArchived: true },
+            },
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("creates an unarchive meter update for an archived current Meter", () =>
+    Effect.gen(function* () {
+      const desired = new Meter("requests", {
+        name: "Requests",
+        unit: "scalar",
+        filter: and(eventName("eq", "request")),
+        aggregation: count(),
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, desired.spec, true);
+
+      const operations = yield* MeterResourceAdapter.createOperationsFromPlan(
+        {
+          _tag: "Update",
+          address: desired.address,
+          kind: "meter",
+          desired,
+          current,
+          changes: [{ _tag: "FieldChange", path: ["isArchived"], before: true, after: false }],
+        },
+        { nextOperationId: () => "op_1" },
+      );
+
+      expect(operations).toEqual([
+        {
+          _tag: "Operation",
+          id: "op_1",
+          address: "meter.requests",
+          kind: "meter",
+          action: {
+            _tag: "UpdateMeter",
+            id: "polar-requests",
+            payload: { isArchived: false },
+          },
+          destructiveness: { _tag: "NonDestructive" },
+          rollback: {
+            _tag: "RollbackOperation",
+            action: {
+              _tag: "UpdateMeter",
+              id: "polar-requests",
               payload: { isArchived: true },
             },
           },
@@ -166,6 +215,7 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
               aggregation: { func: "sum", property: "quantity" },
             },
           },
+          destructiveness: { _tag: "NonDestructive" },
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -183,6 +233,39 @@ describe("MeterResourceAdapter.createOperationsFromPlan", () => {
           },
         },
       ]);
+    }),
+  );
+});
+
+describe("MeterResourceAdapter.diff", () => {
+  beforeEach(() => {
+    resetRegistry();
+  });
+
+  it.effect("returns an update node when a desired Meter is currently archived", () =>
+    Effect.gen(function* () {
+      const desired = new Meter("requests", {
+        name: "Requests",
+        unit: "scalar",
+        filter: and(eventName("eq", "request")),
+        aggregation: count(),
+      }).toDesiredResource();
+      const current = currentFromDesired(desired, desired.spec, true);
+
+      const result = yield* MeterResourceAdapter.diff(desired, current);
+
+      expect(result).toMatchObject({
+        _tag: "Planned",
+        node: {
+          _tag: "Update",
+          address: "meter.requests",
+          kind: "meter",
+          desired,
+          current,
+          changes: [{ _tag: "FieldChange", path: ["isArchived"], before: true, after: false }],
+        },
+        diagnostics: [],
+      });
     }),
   );
 });

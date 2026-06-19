@@ -12,7 +12,9 @@ import type {
   ResourceExecutablePlanNode,
 } from "../services/resource-adapter-registry.js";
 import {
+  destructive,
   managedMetadata,
+  nonDestructive,
   polarIdRef,
   pushFieldChange,
   unsupportedRollback,
@@ -31,14 +33,21 @@ const meterCreatePayload = (
   aggregation: node.desired.spec.aggregation as MeterCreateOperationPayload["aggregation"],
 });
 
-const hasChanged = (changes: ReadonlyArray<FieldChange>, field: keyof MeterSpec): boolean =>
-  changes.some((change) => change.path[0] === field);
+const hasChanged = (
+  changes: ReadonlyArray<FieldChange>,
+  field: keyof MeterSpec | "isArchived",
+): boolean => changes.some((change) => change.path[0] === field);
 
 const meterUpdatePayload = (
   spec: MeterSpec,
   changes: ReadonlyArray<FieldChange>,
+  isArchived?: boolean,
 ): MeterUpdateOperationPayload => {
   const payload: MeterUpdateOperationPayload = {};
+
+  if (hasChanged(changes, "isArchived")) {
+    payload.isArchived = isArchived;
+  }
 
   if (hasChanged(changes, "name")) {
     payload.name = spec.name;
@@ -84,6 +93,7 @@ const createMeterOperationFromPlanNode = (
           _tag: "CreateMeter",
           payload: meterCreatePayload(node),
         },
+        destructiveness: nonDestructive(),
         rollback: {
           _tag: "RollbackOperation",
           action: {
@@ -97,7 +107,7 @@ const createMeterOperationFromPlanNode = (
       const action: OperationAction = {
         _tag: "UpdateMeter",
         id: node.current.polarId,
-        payload: meterUpdatePayload(node.desired.spec, node.changes),
+        payload: meterUpdatePayload(node.desired.spec, node.changes, false),
       };
 
       return {
@@ -106,12 +116,13 @@ const createMeterOperationFromPlanNode = (
         address: node.address,
         kind: "meter",
         action,
+        destructiveness: nonDestructive(),
         rollback: {
           _tag: "RollbackOperation",
           action: {
             _tag: "UpdateMeter",
             id: node.current.polarId,
-            payload: meterUpdatePayload(node.current.spec, node.changes),
+            payload: meterUpdatePayload(node.current.spec, node.changes, node.current.isRemoved),
           },
         },
       };
@@ -127,6 +138,7 @@ const createMeterOperationFromPlanNode = (
           id: node.current.polarId,
           payload: { isArchived: true },
         },
+        destructiveness: destructive("Removes the meter from active billing."),
         rollback: unsupportedRollback("Archive rollback is not implemented yet."),
       };
   }
@@ -142,6 +154,7 @@ export const MeterResourceAdapter: ResourceAdapter<MeterKind, MeterSpec> = {
     Effect.sync(() => {
       const changes: Array<FieldChange> = [];
 
+      pushFieldChange(changes, ["isArchived"], current.isRemoved, false);
       pushFieldChange(changes, ["name"], current.spec.name, desired.spec.name);
       pushFieldChange(changes, ["unit"], current.spec.unit, desired.spec.unit);
       pushFieldChange(changes, ["customLabel"], current.spec.customLabel, desired.spec.customLabel);

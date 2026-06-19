@@ -4,9 +4,14 @@ import { ResourceAddress as ResourceAddressSchema, type ResourceAddress } from "
 import type { OperationProgram } from "../types/operation-planner-types.js";
 import type { OperationAction } from "../operations/actions.js";
 import type { ResourceBinding } from "../operations/bindings.js";
-import type { Operation } from "../operations/operation.js";
+import {
+  isDestructiveOperation,
+  OperationDestructiveness,
+  type Operation,
+} from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
 import { PolarClient, PolarClientError } from "./polar-client.js";
+import { DestructiveConfirmation } from "./destructive-confirmation.js";
 
 export type { ResourceBinding, ResourceBindings } from "../operations/bindings.js";
 
@@ -19,6 +24,21 @@ export class ExecutorRefResolutionError extends Schema.TaggedErrorClass<Executor
   },
 ) {}
 
+export class DestructiveOperationRejected extends Schema.TaggedErrorClass<DestructiveOperationRejected>()(
+  "DestructiveOperationRejected",
+  {
+    operationId: Schema.String,
+    address: ResourceAddressSchema,
+    action: Schema.String,
+    reason: Schema.String,
+    message: Schema.String,
+  },
+) {}
+
+export type ExecutorOptions = {
+  readonly allowDestructive?: boolean;
+};
+
 type DeepResolved<T> = T extends OperationRef
   ? string
   : T extends ReadonlyArray<infer A>
@@ -30,6 +50,8 @@ type DeepResolved<T> = T extends OperationRef
 type ResolvedOperationAction = DeepResolved<OperationAction>;
 
 type ExecutorError = ExecutorRefResolutionError | PolarClientError;
+
+type ExecutorFailure = ExecutorError | DestructiveOperationRejected;
 
 type ExecutionBindings = Map<ResourceAddress, ResourceBinding>;
 
@@ -94,13 +116,15 @@ export class Executor extends Context.Service<
   {
     readonly execute: (
       program: OperationProgram,
-    ) => Effect.Effect<void, ExecutorRefResolutionError | PolarClientError>;
+      options?: ExecutorOptions,
+    ) => Effect.Effect<void, ExecutorFailure>;
   }
 >()("@app/Executor") {
   static readonly layer = Layer.effect(
     Executor,
     Effect.gen(function* () {
       const polar = yield* PolarClient;
+      const destructiveConfirmation = yield* DestructiveConfirmation;
 
       const executeResolvedAction = (
         action: ResolvedOperationAction,
@@ -180,6 +204,44 @@ export class Executor extends Context.Service<
           }),
         );
 
+      const rejectUnconfirmedOperation = (
+        operation: Operation,
+      ): Effect.Effect<never, DestructiveOperationRejected> => {
+        const destructiveness = operation.destructiveness;
+        return Effect.fail(
+          new DestructiveOperationRejected({
+            operationId: operation.id,
+            address: operation.address,
+            action: operation.action._tag,
+            reason: OperationDestructiveness.guards.Destructive(destructiveness)
+              ? destructiveness.reason
+              : "",
+            message: `Destructive operation ${operation.action._tag} on ${operation.address} was not confirmed.`,
+          }),
+        );
+      };
+
+      const confirmDestructiveOperations = (
+        operations: ReadonlyArray<Operation>,
+        options: ExecutorOptions | undefined,
+      ): Effect.Effect<void, DestructiveOperationRejected> =>
+        Effect.gen(function* () {
+          if (options?.allowDestructive === true) {
+            return;
+          }
+
+          const destructiveOperations = operations.filter(isDestructiveOperation);
+          if (destructiveOperations.length === 0) {
+            return;
+          }
+
+          const confirmed = yield* destructiveConfirmation.confirm(destructiveOperations);
+
+          if (!confirmed) {
+            return yield* rejectUnconfirmedOperation(destructiveOperations[0]!);
+          }
+        });
+
       const executeOperations = (
         operations: ReadonlyArray<Operation>,
         bindings: ExecutionBindings,
@@ -202,10 +264,12 @@ export class Executor extends Context.Service<
         });
 
       return Executor.of({
-        execute: (program) =>
+        execute: (program, options) =>
           Effect.gen(function* () {
             const bindings: ExecutionBindings = new Map(program.initialBindings);
             const rollbackStack: Array<OperationAction> = [];
+
+            yield* confirmDestructiveOperations(program.operations, options);
 
             const result = yield* executeOperations(program.operations, bindings, rollbackStack);
 

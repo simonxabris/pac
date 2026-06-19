@@ -250,9 +250,6 @@ export class Renderer extends Context.Service<
 
           if (deletes.length > 0) {
             yield* Console.log(`\nDelete (${deletes.length}):`);
-            yield* Console.log(
-              "  WARNING: delete-mode removals are destructive and may revoke existing access or grants.",
-            );
             for (const node of deletes) {
               yield* Console.log(renderNode(node));
             }
@@ -269,13 +266,6 @@ export class Renderer extends Context.Service<
             yield* Console.log(`\nBlocked (${blocked.length}):`);
             for (const node of blocked) {
               yield* Console.log(renderNode(node));
-            }
-          }
-
-          if (plan.edges.length > 0) {
-            yield* Console.log(`\nDependencies (${plan.edges.length}):`);
-            for (const edge of plan.edges) {
-              yield* Console.log(`  ${edge.from} -> ${edge.to}`);
             }
           }
 

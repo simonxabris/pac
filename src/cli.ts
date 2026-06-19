@@ -15,6 +15,7 @@ import { planCommand } from "./commands/plan.js";
 import { ConfigLoader } from "./services/config-loader.js";
 import { AppConfig } from "./services/app-config.js";
 import { Executor } from "./services/executor.js";
+import { DestructiveConfirmationLive } from "./services/destructive-confirmation.js";
 import { CodeGenerator } from "./services/code-generator.js";
 import { ResourceAdopter } from "./services/resource-adopter.js";
 import { OperationPlanner } from "./services/operation-planner.js";
@@ -31,7 +32,7 @@ const ResourceCommandBaseLive = Layer.mergeAll(
   Planner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive)),
   OperationPlanner.layer.pipe(Layer.provide(ResourceAdapterRegistryLive)),
   RemoteResourceFetcher.layer.pipe(Layer.provide(PolarClientLive)),
-  Executor.layer.pipe(Layer.provide(PolarClientLive)),
+  Executor.layer.pipe(Layer.provide(Layer.mergeAll(PolarClientLive, DestructiveConfirmationLive))),
   Renderer.layer,
   CodeGenerator.layer,
   ConfigLoader.layer,

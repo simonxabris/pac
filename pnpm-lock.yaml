@@ -23,6 +23,9 @@ importers:
       effect:
         specifier: 4.0.0-beta.76
         version: 4.0.0-beta.76
+      kleur:
+        specifier: ^4.1.5
+        version: 4.1.5
       ts-morph:
         specifier: ^28.0.0
         version: 28.0.0
@@ -1016,6 +1019,10 @@ packages:
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
+
+  kleur@4.1.5:
+    resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
+    engines: {node: '>=6'}
 
   kubernetes-types@1.30.0:
     resolution: {integrity: sha512-Dew1okvhM/SQcIa2rcgujNndZwU8VnSapDgdxlYoB84ZlpAD43U6KLAFqYo17ykSFGHNPrg0qry0bP+GJd9v7Q==}
@@ -2105,6 +2112,8 @@ snapshots:
       istanbul-lib-report: 3.0.1
 
   js-tokens@10.0.0: {}
+
+  kleur@4.1.5: {}
 
   kubernetes-types@1.30.0: {}
 

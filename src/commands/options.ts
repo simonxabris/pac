@@ -15,8 +15,8 @@ export const configFlag = Flag.string("config").pipe(
   Flag.withDescription("Path to the PAC config file to load"),
 );
 
-export const allowDeleteFlag = Flag.boolean("allow-delete").pipe(
-  Flag.withDescription("Allow destructive delete-mode removals during deploy"),
+export const allowDestructiveFlag = Flag.boolean("allow-destructive").pipe(
+  Flag.withDescription("Allow destructive operations during deploy"),
 );
 
 export const generatePathFlag = Flag.string("path").pipe(

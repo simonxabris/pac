@@ -1,7 +1,7 @@
 import { Equal } from "effect";
 import type { ResourceKind } from "../core/kind.js";
 import { PAC_METADATA_KEY } from "../core/metadata.js";
-import type { RollbackAction } from "../operations/operation.js";
+import { OperationDestructiveness, type RollbackAction } from "../operations/operation.js";
 import type { OperationRef } from "../operations/ref.js";
 import type { FieldChange } from "../services/planner.js";
 
@@ -43,6 +43,12 @@ export const unsupportedRollback = (reason: string): RollbackAction => ({
   _tag: "UnsupportedRollback",
   reason,
 });
+
+export const nonDestructive = (): OperationDestructiveness =>
+  OperationDestructiveness.cases.NonDestructive.make({});
+
+export const destructive = (reason: string): OperationDestructiveness =>
+  OperationDestructiveness.cases.Destructive.make({ reason });
 
 export const managedMetadata = (
   kind: ResourceKind,

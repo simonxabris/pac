@@ -19,7 +19,9 @@ import type {
   ResourceExecutablePlanNode,
 } from "../services/resource-adapter-registry.js";
 import {
+  destructive,
   managedMetadata,
+  nonDestructive,
   polarIdRef,
   pushFieldChange,
   unsupportedRollback,
@@ -155,8 +157,10 @@ const productCreatePayload = (
   };
 };
 
-const hasChanged = (changes: ReadonlyArray<FieldChange>, field: keyof ProductSpec): boolean =>
-  changes.some((change) => change.path[0] === field);
+const hasChanged = (
+  changes: ReadonlyArray<FieldChange>,
+  field: keyof ProductSpec | "isArchived",
+): boolean => changes.some((change) => change.path[0] === field);
 
 const productPriceUpdatePayloads = (
   prices: ReadonlyArray<ProductPriceSpec>,
@@ -187,8 +191,13 @@ const productUpdatePayload = (
   spec: ProductSpec,
   changes: ReadonlyArray<FieldChange>,
   providerState: CurrentProductProviderState,
+  isArchived?: boolean,
 ): ProductUpdateOperationPayload => {
   const payload: ProductUpdateOperationPayload = {};
+
+  if (hasChanged(changes, "isArchived")) {
+    payload.isArchived = isArchived;
+  }
 
   if (hasChanged(changes, "name")) {
     payload.name = spec.name;
@@ -232,6 +241,7 @@ const createProductOperationFromPlanNode = (
             _tag: "CreateProduct",
             payload: productCreatePayload(node),
           },
+          destructiveness: nonDestructive(),
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -254,6 +264,7 @@ const createProductOperationFromPlanNode = (
             id: polarIdRef(node.address),
             payload: productBenefitsUpdatePayload(node.desired.spec.benefits),
           },
+          destructiveness: nonDestructive(),
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -280,14 +291,20 @@ const createProductOperationFromPlanNode = (
           action: {
             _tag: "UpdateProduct",
             id: node.current.polarId,
-            payload: productUpdatePayload(node.desired.spec, node.changes, providerState),
+            payload: productUpdatePayload(node.desired.spec, node.changes, providerState, false),
           },
+          destructiveness: nonDestructive(),
           rollback: {
             _tag: "RollbackOperation",
             action: {
               _tag: "UpdateProduct",
               id: node.current.polarId,
-              payload: productUpdatePayload(node.current.spec, node.changes, providerState),
+              payload: productUpdatePayload(
+                node.current.spec,
+                node.changes,
+                providerState,
+                node.current.isRemoved,
+              ),
             },
           },
         });
@@ -304,6 +321,7 @@ const createProductOperationFromPlanNode = (
             id: node.current.polarId,
             payload: productBenefitsUpdatePayload(node.desired.spec.benefits),
           },
+          destructiveness: nonDestructive(),
           rollback: {
             _tag: "RollbackOperation",
             action: {
@@ -329,6 +347,7 @@ const createProductOperationFromPlanNode = (
             id: node.current.polarId,
             payload: { isArchived: true },
           },
+          destructiveness: destructive("Removes the product from active sale."),
           rollback: unsupportedRollback("Archive rollback is not implemented yet."),
         },
       ];
@@ -406,6 +425,7 @@ export const ProductResourceAdapter: ResourceAdapter<ProductKind, ProductSpec> =
 
       const changes: Array<FieldChange> = [];
 
+      pushFieldChange(changes, ["isArchived"], current.isRemoved, false);
       pushFieldChange(changes, ["name"], current.spec.name, desired.spec.name);
       pushFieldChange(changes, ["description"], current.spec.description, desired.spec.description);
       pushFieldChange(changes, ["visibility"], current.spec.visibility, desired.spec.visibility);
